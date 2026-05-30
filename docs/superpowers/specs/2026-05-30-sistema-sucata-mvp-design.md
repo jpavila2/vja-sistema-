@@ -57,6 +57,9 @@ Frota/veículos · relatórios (lucratividade, DRE, rankings) · PWA · dark mod
 - **Frontend/Backend:** Next.js 14 (App Router) + TypeScript + Tailwind CSS, um único projeto.
 - **Banco/Auth/Storage:** Supabase (PostgreSQL + Auth + Storage).
 - **Deploy:** Vercel (app) + Supabase (banco).
+- **Conta Supabase:** projeto numa **organização dedicada** (ex: `Sucata`), separada da
+  "Blanc House CRM", na mesma conta do João. Plano Free (suficiente para o volume).
+  A organização é criada manualmente no painel; o projeto é criado via MCP na implementação.
 - **Validação:** Zod + react-hook-form.
 - **Idioma:** tudo em português (pt-BR). Responsivo (funciona no celular/tablet).
 
