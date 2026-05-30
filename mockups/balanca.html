@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Balança — Nova Compra (MOCKUP)</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#ffffff; --ink:#16202a; --muted:#5b6b78;
+    --green:#16a34a; --green-d:#15803d; --red:#dc2626; --blue:#2563eb;
+    --line:#dfe5ea; --shadow:0 2px 10px rgba(0,0,0,.08);
+    --tap:#eef2f5;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--ink);
+    font-size:18px; -webkit-font-smoothing:antialiased;
+  }
+  .mock-tag{
+    position:fixed; top:8px; right:8px; z-index:99;
+    background:#111827; color:#fff; font-size:11px; font-weight:700;
+    padding:4px 8px; border-radius:6px; opacity:.6; letter-spacing:.5px;
+  }
+  header{
+    background:var(--card); border-bottom:1px solid var(--line);
+    padding:14px 18px; display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:10;
+  }
+  header .title{font-size:22px; font-weight:800; display:flex; gap:10px; align-items:center;}
+  header .clock{font-size:20px; font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .wrap{max-width:1100px; margin:0 auto; padding:16px;}
+  .step-label{font-size:20px; font-weight:800; margin:6px 2px 14px;}
+  .catador-bar{
+    display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap;
+  }
+  .chip{
+    background:var(--card); border:2px solid var(--line); border-radius:999px;
+    padding:10px 18px; font-size:17px; font-weight:700; cursor:pointer;
+  }
+  .chip.active{border-color:var(--blue); color:var(--blue); background:#eff6ff;}
+
+  /* material grid */
+  .grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
+  @media(max-width:640px){ .grid{grid-template-columns:repeat(2,1fr);} body{font-size:17px;} }
+  .mat{
+    background:var(--card); border:2px solid var(--line); border-radius:18px;
+    padding:18px 10px; text-align:center; cursor:pointer; box-shadow:var(--shadow);
+    transition:transform .05s, border-color .1s; min-height:120px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  }
+  .mat:active{transform:scale(.96);}
+  .mat .emo{font-size:40px; line-height:1;}
+  .mat .nm{font-size:20px; font-weight:800;}
+  .mat .pr{font-size:16px; color:var(--green-d); font-weight:700;}
+  .mat.add{border-style:dashed; color:var(--muted); box-shadow:none;}
+
+  /* basket */
+  .basket{
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    margin-top:18px; box-shadow:var(--shadow); overflow:hidden;
+  }
+  .basket h3{margin:0; padding:14px 18px; font-size:18px; border-bottom:1px solid var(--line); background:#fafbfc;}
+  .item{display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line);}
+  .item .ic{font-size:26px;}
+  .item .info{flex:1;}
+  .item .info .a{font-weight:800; font-size:18px;}
+  .item .info .b{color:var(--muted); font-size:15px;}
+  .item .val{font-weight:800; font-size:19px;}
+  .item .del{background:#fee2e2; color:var(--red); border:none; border-radius:10px; padding:10px 12px; font-size:18px; cursor:pointer;}
+  .empty{padding:26px 18px; color:var(--muted); text-align:center;}
+  .total{display:flex; justify-content:space-between; align-items:center; padding:16px 18px; font-size:24px; font-weight:900;}
+  .total .num{color:var(--green-d);}
+  .finalize{
+    width:100%; border:none; background:var(--green); color:#fff;
+    font-size:24px; font-weight:900; padding:22px; cursor:pointer;
+  }
+  .finalize:active{background:var(--green-d);}
+  .finalize:disabled{background:#cbd5d8; cursor:not-allowed;}
+
+  /* keypad overlay */
+  .overlay{position:fixed; inset:0; background:rgba(15,23,32,.45); display:none; align-items:flex-end; z-index:50;}
+  .overlay.open{display:flex;}
+  .sheet{
+    background:var(--card); width:100%; max-width:1100px; margin:0 auto;
+    border-radius:22px 22px 0 0; padding:18px 18px calc(18px + env(safe-area-inset-bottom));
+    animation:up .18s ease;
+  }
+  @keyframes up{from{transform:translateY(40px); opacity:.6;} to{transform:translateY(0); opacity:1;}}
+  .sheet .head{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+  .sheet .head .emo{font-size:34px;}
+  .sheet .head .nm{font-size:24px; font-weight:900;}
+  .sheet .head .pr{margin-left:auto; font-size:18px; font-weight:800; color:var(--green-d);}
+  .kp-top{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;}
+  @media(max-width:640px){ .kp-top{grid-template-columns:1fr;} }
+  .display{
+    background:var(--bg); border:2px solid var(--line); border-radius:14px;
+    padding:16px; text-align:center;
+  }
+  .display .lab{font-size:14px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.5px;}
+  .display .big{font-size:42px; font-weight:900; font-variant-numeric:tabular-nums;}
+  .display.value .big{color:var(--green-d);}
+  .keys{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
+  .key{
+    background:#f1f4f6; border:1px solid var(--line); border-radius:14px;
+    font-size:30px; font-weight:800; padding:18px 0; cursor:pointer; text-align:center;
+  }
+  .key:active{background:#e2e8eb;}
+  .key.wide{grid-column:span 1;}
+  .key.back{background:#fee2e2; color:var(--red);}
+  .scale-btn{
+    margin-top:6px; width:100%; background:#eff6ff; color:var(--blue); border:2px solid #bfdbfe;
+    border-radius:14px; padding:14px; font-size:17px; font-weight:800; cursor:pointer;
+  }
+  .sheet .actions{display:grid; grid-template-columns:1fr 2fr; gap:12px; margin-top:16px;}
+  .btn-cancel{background:#eef2f5; border:none; border-radius:14px; font-size:18px; font-weight:800; padding:18px; cursor:pointer;}
+  .btn-add{background:var(--green); color:#fff; border:none; border-radius:14px; font-size:20px; font-weight:900; padding:18px; cursor:pointer;}
+  .btn-add:active{background:var(--green-d);}
+
+  /* toast */
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:#16202a; color:#fff; padding:16px 26px; border-radius:14px;
+    font-size:20px; font-weight:800; z-index:80; display:none; box-shadow:var(--shadow);
+  }
+  .toast.show{display:block; animation:pop .2s;}
+  @keyframes pop{from{transform:translateX(-50%) scale(.9);} to{transform:translateX(-50%) scale(1);}}
+</style>
+</head>
+<body>
+<div class="mock-tag">MOCKUP</div>
+
+<header>
+  <div class="title">♻️ Compra — Balança</div>
+  <div class="clock" id="clock">--:--</div>
+</header>
+
+<div class="wrap">
+  <div class="catador-bar">
+    <span style="font-weight:800;">Catador:</span>
+    <div class="chip active" id="chipAvulso" onclick="setCatador('avulso')">Avulso</div>
+    <div class="chip" onclick="setCatador('Seu Zé')">Seu Zé</div>
+    <div class="chip" onclick="setCatador('Marcão')">Marcão</div>
+    <div class="chip" onclick="setCatador('+ buscar')">＋ buscar</div>
+  </div>
+
+  <div class="step-label">1) Toque no material</div>
+  <div class="grid" id="grid"></div>
+
+  <div class="basket">
+    <h3>Itens desta compra</h3>
+    <div id="items"><div class="empty">Nenhum item ainda. Toque num material acima.</div></div>
+    <div class="total"><span>TOTAL</span><span class="num" id="total">R$ 0,00</span></div>
+    <button class="finalize" id="finBtn" disabled onclick="finalize()">💵 FINALIZAR E PAGAR</button>
+  </div>
+</div>
+
+<!-- keypad -->
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <div class="head">
+      <span class="emo" id="kEmo">🪙</span>
+      <span class="nm" id="kNm">Material</span>
+      <span class="pr" id="kPr">R$ 0,00/kg</span>
+    </div>
+    <div class="kp-top">
+      <div class="display"><div class="lab">Peso (kg)</div><div class="big" id="kWeight">0</div></div>
+      <div class="display value"><div class="lab">Valor</div><div class="big" id="kValue">R$ 0,00</div></div>
+    </div>
+    <div class="keys">
+      <div class="key" onclick="press('7')">7</div>
+      <div class="key" onclick="press('8')">8</div>
+      <div class="key" onclick="press('9')">9</div>
+      <div class="key" onclick="press('4')">4</div>
+      <div class="key" onclick="press('5')">5</div>
+      <div class="key" onclick="press('6')">6</div>
+      <div class="key" onclick="press('1')">1</div>
+      <div class="key" onclick="press('2')">2</div>
+      <div class="key" onclick="press('3')">3</div>
+      <div class="key" onclick="press(',')">,</div>
+      <div class="key" onclick="press('0')">0</div>
+      <div class="key back" onclick="press('back')">⌫</div>
+    </div>
+    <button class="scale-btn" onclick="pullScale()">📟 Puxar peso da balança (futuro)</button>
+    <div class="actions">
+      <button class="btn-cancel" onclick="closeKp()">Cancelar</button>
+      <button class="btn-add" onclick="addItem()">✅ Adicionar item</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MATERIALS = [
+  {nm:"Papelão",   emo:"📦", price:0.80},
+  {nm:"PET",       emo:"🥤", price:1.20},
+  {nm:"Alumínio",  emo:"🪙", price:5.50},
+  {nm:"Ferro",     emo:"🔩", price:0.90},
+  {nm:"Cobre",     emo:"🟧", price:32.00},
+  {nm:"Inox",      emo:"⚙️", price:4.00},
+  {nm:"Bateria",   emo:"🔋", price:6.00},
+  {nm:"Plástico",  emo:"♻️", price:1.50},
+];
+let basket = [];
+let catador = "Avulso";
+let cur = null;        // material being weighed
+let weightStr = "0";   // raw weight buffer
+
+const brl = n => "R$ " + n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function renderGrid(){
+  const g = document.getElementById("grid");
+  g.innerHTML = MATERIALS.map((m,i)=>`
+    <div class="mat" onclick="openKp(${i})">
+      <div class="emo">${m.emo}</div>
+      <div class="nm">${m.nm}</div>
+      <div class="pr">${brl(m.price)}/kg</div>
+    </div>`).join("") +
+    `<div class="mat add" onclick="toast('No sistema real: lista completa + busca')">
+      <div class="emo">➕</div><div class="nm">Outro</div><div class="pr">buscar...</div></div>`;
+}
+
+function setCatador(c){
+  catador = c==='avulso' ? 'Avulso' : c;
+  document.querySelectorAll('.chip').forEach(ch=>ch.classList.remove('active'));
+  event.target.classList.add('active');
+  if(c==='+ buscar') toast('No sistema real: busca de catador cadastrado');
+}
+
+function weightNum(){ return parseFloat(weightStr.replace(',','.')) || 0; }
+
+function openKp(i){
+  cur = MATERIALS[i];
+  weightStr = "0";
+  document.getElementById("kEmo").textContent = cur.emo;
+  document.getElementById("kNm").textContent = cur.nm;
+  document.getElementById("kPr").textContent = brl(cur.price)+"/kg";
+  updateKp();
+  document.getElementById("overlay").classList.add("open");
+}
+function closeKp(){ document.getElementById("overlay").classList.remove("open"); }
+
+function press(k){
+  if(k==='back'){ weightStr = weightStr.length>1 ? weightStr.slice(0,-1) : "0"; }
+  else if(k===','){ if(!weightStr.includes(',')) weightStr += ','; }
+  else { weightStr = (weightStr==="0") ? k : weightStr + k; }
+  updateKp();
+}
+function pullScale(){
+  // simula leitura da balança digital
+  weightStr = (Math.random()*40+1).toFixed(1).replace('.',',');
+  updateKp();
+  toast('Peso puxado da balança 📟');
+}
+function updateKp(){
+  document.getElementById("kWeight").textContent = weightStr;
+  document.getElementById("kValue").textContent = brl(weightNum()*cur.price);
+}
+
+function addItem(){
+  const w = weightNum();
+  if(w<=0){ toast('Digite o peso'); return; }
+  basket.push({nm:cur.nm, emo:cur.emo, price:cur.price, weight:w, value:w*cur.price});
+  closeKp();
+  renderBasket();
+}
+function removeItem(i){ basket.splice(i,1); renderBasket(); }
+
+function renderBasket(){
+  const el = document.getElementById("items");
+  if(basket.length===0){
+    el.innerHTML = `<div class="empty">Nenhum item ainda. Toque num material acima.</div>`;
+  } else {
+    el.innerHTML = basket.map((it,i)=>`
+      <div class="item">
+        <span class="ic">${it.emo}</span>
+        <div class="info">
+          <div class="a">${it.nm}</div>
+          <div class="b">${it.weight.toLocaleString("pt-BR")} kg × ${brl(it.price)}</div>
+        </div>
+        <span class="val">${brl(it.value)}</span>
+        <button class="del" onclick="removeItem(${i})">🗑️</button>
+      </div>`).join("");
+  }
+  const total = basket.reduce((s,i)=>s+i.value,0);
+  document.getElementById("total").textContent = brl(total);
+  document.getElementById("finBtn").disabled = basket.length===0;
+  document.getElementById("finBtn").textContent = basket.length===0
+    ? "💵 FINALIZAR E PAGAR"
+    : `💵 FINALIZAR E PAGAR (${brl(total)})`;
+}
+
+function finalize(){
+  const total = basket.reduce((s,i)=>s+i.value,0);
+  toast(`✅ Compra salva — ${catador} — ${brl(total)}`);
+  basket = []; catador="Avulso";
+  document.querySelectorAll('.chip').forEach(ch=>ch.classList.remove('active'));
+  document.getElementById('chipAvulso').classList.add('active');
+  renderBasket();
+}
+
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+function tick(){
+  const d = new Date();
+  document.getElementById("clock").textContent =
+    String(d.getHours()).padStart(2,'0')+":"+String(d.getMinutes()).padStart(2,'0');
+}
+
+renderGrid(); renderBasket(); tick(); setInterval(tick,10000);
+</script>
+</body>
+</html>
