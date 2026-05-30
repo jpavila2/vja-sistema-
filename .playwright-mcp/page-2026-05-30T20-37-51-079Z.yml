@@ -1,8 +1,0 @@
-- generic [active] [ref=e1]:
-  - generic [ref=e2]:
-    - banner [ref=e3]:
-      - generic [ref=e4]: ♻️ Sucata
-      - generic [ref=e5]: Balança · balanca
-    - main [ref=e6]:
-      - heading "Balança — em construção" [level=1] [ref=e7]
-  - alert [ref=e8]
