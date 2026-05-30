@@ -8,7 +8,7 @@ O MVP (Fase 1) foi quebrado em 4 planos sequenciais. Cada um entrega software qu
 | # | Plano | Entrega testável | Arquivo |
 |---|-------|------------------|---------|
 | 1 | Fundação + Auth | App Next.js sobe; login funciona; perfis e RLS no Supabase; base de testes verde | `2026-05-30-mvp-fase1-01-fundacao-auth.md` |
-| 2 | Materiais + Pessoas (CRM) | Cadastrar/listar/editar/buscar materiais e pessoas | `(a escrever ao iniciar o plano 2)` |
+| 2 | Materiais + Pessoas (CRM) | Cadastrar/listar/editar/buscar materiais e pessoas | `2026-05-30-mvp-fase1-02-materiais-pessoas.md` |
 | 3 | Compras + Estoque | Lançar compra touch com vários itens; estoque sobe via `stock_movements` | `(a escrever ao iniciar o plano 3)` |
 | 4 | Conferência + Caixa + Painel | Conferir/cancelar compras; caixa do dia automático; painel admin | `(a escrever ao iniciar o plano 4)` |
 
