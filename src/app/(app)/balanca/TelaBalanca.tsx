@@ -22,7 +22,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const [pct, setPct] = useState(0); // % de impureza
   const [pctStr, setPctStr] = useState(""); // campo custom
   const [modo, setModo] = useState<ModoCatador>("conhecido");
-  const [catadorId, setCatadorId] = useState<number | "">("");
+  const [busca, setBusca] = useState("");
   const [novoNome, setNovoNome] = useState("");
   const [novoTel, setNovoTel] = useState("");
   const [msg, setMsg] = useState("");
@@ -65,8 +65,11 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
       if (novoNome.trim() === "") return null;
       return { pessoa_id: null, nome: novoNome.trim(), tel: novoTel.trim() };
     }
-    if (catadorId === "") return null;
-    return { pessoa_id: Number(catadorId), nome: "", tel: "" };
+    const achado = fornecedores.find(
+      (f) => f.nome.trim().toLowerCase() === busca.trim().toLowerCase()
+    );
+    if (!achado) return null;
+    return { pessoa_id: achado.id, nome: "", tel: "" };
   }
 
   function finalizar() {
@@ -81,7 +84,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
       });
       if (res.ok) {
         setMsg(`✅ Compra salva — ${formatBRL(total)}`);
-        setCesta([]); setNovoNome(""); setNovoTel(""); setCatadorId("");
+        setCesta([]); setNovoNome(""); setNovoTel(""); setBusca("");
       } else setMsg("Erro: " + res.erro);
     });
   }
@@ -100,11 +103,25 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
           <button onClick={() => setModo("avulso")} className={tab(modo === "avulso")}>Avulso</button>
         </div>
         {modo === "conhecido" ? (
-          <select value={catadorId} onChange={(e) => setCatadorId(e.target.value === "" ? "" : Number(e.target.value))}
-            className="w-full rounded-xl border p-3 text-base">
-            <option value="">Selecione o catador…</option>
-            {fornecedores.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-          </select>
+          <div className="flex gap-2">
+            <input
+              list="lista-catadores"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Digite para encontrar o catador…"
+              className="min-w-0 flex-1 rounded-xl border p-3 text-base"
+            />
+            <datalist id="lista-catadores">
+              {fornecedores.map((f) => <option key={f.id} value={f.nome} />)}
+            </datalist>
+            <button
+              type="button"
+              onClick={() => { setNovoNome(busca.trim()); setModo("novo"); }}
+              title="Cadastrar novo catador"
+              className="shrink-0 rounded-xl bg-marca-teal px-5 text-2xl font-black text-white active:scale-95">
+              +
+            </button>
+          </div>
         ) : modo === "novo" ? (
           <div className="flex flex-wrap gap-2">
             <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome do catador"
