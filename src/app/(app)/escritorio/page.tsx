@@ -4,6 +4,8 @@ export default function EscritorioPage() {
   const cards = [
     { href: "/escritorio/materiais", titulo: "Materiais", desc: "Catálogo e preços" },
     { href: "/escritorio/pessoas", titulo: "Pessoas", desc: "Catadores e clientes" },
+    { href: "/escritorio/conferencia", titulo: "Conferência", desc: "Conferir compras do dia" },
+    { href: "/escritorio/caixa", titulo: "Caixa do dia", desc: "Resumo financeiro" },
   ];
   return (
     <div className="space-y-4">
