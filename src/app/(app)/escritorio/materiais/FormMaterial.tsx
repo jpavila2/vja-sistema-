@@ -11,7 +11,7 @@ function Salvar() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending}
-      className="rounded-xl bg-green-600 px-5 py-3 font-bold text-white disabled:opacity-50">
+      className="rounded-full bg-marca-teal px-5 py-3 font-bold text-white hover:bg-marca-teal-dark disabled:opacity-50">
       {pending ? "Salvando..." : "Salvar"}
     </button>
   );

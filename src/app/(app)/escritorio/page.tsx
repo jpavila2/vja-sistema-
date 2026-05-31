@@ -13,7 +13,7 @@ export default function EscritorioPage() {
           <Link
             key={c.href}
             href={c.href}
-            className="rounded-2xl border bg-white p-5 shadow-sm hover:border-green-500"
+            className="rounded-2xl border bg-white p-5 shadow-sm hover:border-marca-teal"
           >
             <div className="text-lg font-bold">{c.titulo}</div>
             <div className="text-sm text-slate-500">{c.desc}</div>

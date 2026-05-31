@@ -19,7 +19,7 @@ export function HeaderNav({ links }: { links: LinkNav[] }) {
             href={l.href}
             className={
               "rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors " +
-              (ativo ? "bg-green-100 text-green-800" : "text-slate-600 hover:bg-slate-100")
+              (ativo ? "bg-marca-teal-light text-marca-teal-dark" : "text-slate-600 hover:bg-slate-100")
             }
           >
             {l.label}

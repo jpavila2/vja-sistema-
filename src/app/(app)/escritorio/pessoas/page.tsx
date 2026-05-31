@@ -11,7 +11,7 @@ export default async function PessoasPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Pessoas (catadores / clientes)</h1>
         <Link href="/escritorio/pessoas/novo"
-          className="rounded-xl bg-green-600 px-4 py-2 font-bold text-white">+ Nova pessoa</Link>
+          className="rounded-full bg-marca-teal px-4 py-2 font-bold text-white hover:bg-marca-teal-dark">+ Nova pessoa</Link>
       </div>
       <PessoasLista pessoas={(data as Pessoa[]) ?? []} />
     </div>

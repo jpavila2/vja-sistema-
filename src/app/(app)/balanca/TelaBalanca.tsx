@@ -112,7 +112,7 @@ export function TelaBalanca({ materiais, fornecedores }: Props) {
             >
               <span className="text-3xl">{m.emoji}</span>
               <span className="text-lg">{m.nome}</span>
-              <span className="text-sm font-bold text-green-700">
+              <span className="text-sm font-bold text-marca-teal-dark">
                 {formatBRL(m.preco_compra)}/{m.unidade}
               </span>
             </button>
@@ -146,12 +146,12 @@ export function TelaBalanca({ materiais, fornecedores }: Props) {
         )}
         <div className="flex items-center justify-between p-4 text-2xl font-black">
           <span>TOTAL</span>
-          <span className="text-green-700">{formatBRL(total)}</span>
+          <span className="text-marca-teal-dark">{formatBRL(total)}</span>
         </div>
         <button
           onClick={finalizar}
           disabled={cesta.length === 0 || pending}
-          className="w-full rounded-b-2xl bg-green-600 p-5 text-2xl font-black text-white disabled:bg-slate-300"
+          className="w-full rounded-b-2xl bg-marca-green p-5 text-2xl font-black text-white disabled:bg-slate-300"
         >
           {pending ? "Salvando..." : `💵 FINALIZAR E PAGAR ${cesta.length ? "(" + formatBRL(total) + ")" : ""}`}
         </button>
@@ -165,7 +165,7 @@ export function TelaBalanca({ materiais, fornecedores }: Props) {
             <div className="mb-3 flex items-center gap-3">
               <span className="text-3xl">{sel.emoji}</span>
               <span className="text-2xl font-black">{sel.nome}</span>
-              <span className="ml-auto font-bold text-green-700">
+              <span className="ml-auto font-bold text-marca-teal-dark">
                 {formatBRL(sel.preco_compra)}/{sel.unidade}
               </span>
             </div>
@@ -176,7 +176,7 @@ export function TelaBalanca({ materiais, fornecedores }: Props) {
               </div>
               <div className="rounded-xl bg-slate-100 p-3 text-center">
                 <div className="text-xs font-bold uppercase text-slate-500">Valor</div>
-                <div className="text-4xl font-black text-green-700">{formatBRL(valorAtual)}</div>
+                <div className="text-4xl font-black text-marca-teal-dark">{formatBRL(valorAtual)}</div>
               </div>
             </div>
             <div className="mb-3 flex items-center gap-2">
@@ -203,7 +203,7 @@ export function TelaBalanca({ materiais, fornecedores }: Props) {
               <button onClick={() => setSel(null)} className={`${btn} bg-slate-200 p-4 text-lg`}>
                 Cancelar
               </button>
-              <button onClick={adicionar} className={`${btn} col-span-2 bg-green-600 p-4 text-xl text-white`}>
+              <button onClick={adicionar} className={`${btn} col-span-2 bg-marca-green p-4 text-xl text-white`}>
                 ✅ Adicionar item
               </button>
             </div>

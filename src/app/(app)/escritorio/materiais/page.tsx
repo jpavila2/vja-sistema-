@@ -11,7 +11,7 @@ export default async function MateriaisPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Materiais</h1>
         <Link href="/escritorio/materiais/novo"
-          className="rounded-xl bg-green-600 px-4 py-2 font-bold text-white">+ Novo material</Link>
+          className="rounded-full bg-marca-teal px-4 py-2 font-bold text-white hover:bg-marca-teal-dark">+ Novo material</Link>
       </div>
       <MateriaisLista materiais={(data as Material[]) ?? []} />
     </div>

@@ -26,7 +26,7 @@ export function PessoasLista({ pessoas }: { pessoas: Pessoa[] }) {
         {
           titulo: "Status",
           render: (p) => (
-            <span className={p.status === "ativo" ? "text-green-700" : "text-slate-400"}>
+            <span className={p.status === "ativo" ? "text-marca-green-dark" : "text-slate-400"}>
               {p.status === "ativo" ? "Ativo" : "Inativo"}
             </span>
           ),
@@ -35,7 +35,7 @@ export function PessoasLista({ pessoas }: { pessoas: Pessoa[] }) {
           titulo: "Ações",
           render: (p) => (
             <div className="flex gap-2">
-              <Link href={`/escritorio/pessoas/editar/${p.id}`} className="text-blue-600">Editar</Link>
+              <Link href={`/escritorio/pessoas/editar/${p.id}`} className="text-marca-teal-dark">Editar</Link>
               <BotaoConfirmar
                 acao={alternarStatusPessoa}
                 hidden={{ id: p.id, status: p.status }}

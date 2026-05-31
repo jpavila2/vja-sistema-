@@ -1,0 +1,3 @@
+Coloque aqui o arquivo do logo do leão como: logo-leao.png
+(de preferência PNG com fundo transparente, ~256x256 ou maior)
+Depois, em src/components/Logo.tsx, troque o emoji 🦁 pela tag <img src="/logo-leao.png" ...>.

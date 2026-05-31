@@ -10,7 +10,7 @@ export default async function EditarPessoaPage({ params }: { params: { id: strin
   if (!data) notFound();
   return (
     <div className="space-y-4">
-      <Link href="/escritorio/pessoas" className="text-blue-600">← Voltar</Link>
+      <Link href="/escritorio/pessoas" className="text-marca-teal-dark">← Voltar</Link>
       <h1 className="text-2xl font-bold">Editar pessoa</h1>
       <FormPessoa pessoa={data as Pessoa} />
     </div>

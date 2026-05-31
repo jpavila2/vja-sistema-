@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { login } from "./actions";
+import { Logo } from "@/components/Logo";
 
 const estadoInicial = { erro: "" };
 
@@ -11,7 +12,7 @@ function Botao() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-xl bg-green-600 py-3 text-lg font-bold text-white disabled:opacity-50"
+      className="w-full rounded-full bg-marca-teal py-3 text-lg font-bold text-white hover:bg-marca-teal-dark disabled:opacity-50"
     >
       {pending ? "Entrando..." : "Entrar"}
     </button>
@@ -23,7 +24,8 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
       <form action={formAction} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow">
-        <h1 className="text-2xl font-extrabold">♻️ Sistema Sucata</h1>
+        <Logo className="justify-center" />
+        <p className="text-center text-sm text-slate-500">Gestão de sucata</p>
         <input name="email" type="email" required placeholder="E-mail"
           className="w-full rounded-xl border p-3 text-lg" />
         <input name="senha" type="password" required placeholder="Senha"

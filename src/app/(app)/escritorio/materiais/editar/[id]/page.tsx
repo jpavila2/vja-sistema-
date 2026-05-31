@@ -10,7 +10,7 @@ export default async function EditarMaterialPage({ params }: { params: { id: str
   if (!data) notFound();
   return (
     <div className="space-y-4">
-      <Link href="/escritorio/materiais" className="text-blue-600">← Voltar</Link>
+      <Link href="/escritorio/materiais" className="text-marca-teal-dark">← Voltar</Link>
       <h1 className="text-2xl font-bold">Editar material</h1>
       <FormMaterial material={data as Material} />
     </div>

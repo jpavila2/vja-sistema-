@@ -22,7 +22,7 @@ export function MateriaisLista({ materiais }: { materiais: Material[] }) {
         {
           titulo: "Status",
           render: (m) => (
-            <span className={m.ativo ? "text-green-700" : "text-slate-400"}>
+            <span className={m.ativo ? "text-marca-green-dark" : "text-slate-400"}>
               {m.ativo ? "Ativo" : "Inativo"}
             </span>
           ),
@@ -31,7 +31,7 @@ export function MateriaisLista({ materiais }: { materiais: Material[] }) {
           titulo: "Ações",
           render: (m) => (
             <div className="flex gap-2">
-              <Link href={`/escritorio/materiais/editar/${m.id}`} className="text-blue-600">Editar</Link>
+              <Link href={`/escritorio/materiais/editar/${m.id}`} className="text-marca-teal-dark">Editar</Link>
               <BotaoConfirmar
                 acao={alternarAtivoMaterial}
                 hidden={{ id: m.id, ativo: String(m.ativo) }}
