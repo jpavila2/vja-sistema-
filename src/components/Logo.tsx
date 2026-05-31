@@ -1,7 +1,7 @@
 /*
   Logo da marca. Hoje usa o emoji 🦁 como placeholder.
   Quando o arquivo `public/logo-leao.png` existir, trocar o <span do emoji> por:
-    <img src="/logo-leao.png" alt="VJA Sucata" className="h-8 w-8 object-contain" />
+    <img src="/logo-leao.png" alt="VJA Reciclagem" className="h-8 w-8 object-contain" />
 */
 export function Logo({ className = "" }: { className?: string }) {
   return (
@@ -10,7 +10,7 @@ export function Logo({ className = "" }: { className?: string }) {
         🦁
       </span>
       <span className="text-lg font-extrabold tracking-tight text-marca-navy">
-        <span className="text-marca-gold">VJA</span> Sucata
+        <span className="text-marca-gold">VJA</span> Reciclagem
       </span>
     </span>
   );

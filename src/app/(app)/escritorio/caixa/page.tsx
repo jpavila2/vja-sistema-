@@ -12,10 +12,11 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
   const { inicio, fim } = limitesDoDiaBR(dia);
   const supabase = await createClient();
 
-  const [{ data: sessao }, { data: movs }, { data: compras }] = await Promise.all([
+  const [{ data: sessao }, { data: movs }, { data: compras }, { data: comprasPixData }] = await Promise.all([
     supabase.from("cash_sessions").select("*").eq("dia", dia).maybeSingle(),
     supabase.from("cash_movements").select("*").eq("dia", dia).order("created_at"),
     supabase.from("purchases").select("total, status").eq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
+    supabase.from("purchases").select("total, status").eq("forma_pagamento", "pix").gte("data_hora", inicio).lt("data_hora", fim),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,6 +25,9 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
   const despesas = movimentos.filter((m) => m.tipo === "despesa");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const comprasDin = ((compras as any[]) ?? []).filter((c) => c.status !== "cancelada");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const comprasPix = ((comprasPixData as any[]) ?? []).filter((c) => c.status !== "cancelada");
+  const totalPix = Math.round(comprasPix.reduce((s, c) => s + Number(c.total), 0) * 100) / 100;
 
   const r = calcularSaldoCaixa({
     saldoInicial: sessao?.saldo_inicial ?? 0,
@@ -75,8 +79,15 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
           <div className="rounded-2xl border bg-white">
             <div className="border-b bg-slate-50 p-3 font-bold text-marca-navy">Compras em dinheiro (automático) — {formatBRL(r.totalCompras)}</div>
             {comprasDin.length === 0 ? <div className="p-4 text-center text-slate-400">Nenhuma.</div> :
-              <div className="p-3 text-sm text-slate-600">{comprasDin.length} compra(s) somando {formatBRL(r.totalCompras)}</div>}
+              <div className="p-3 text-sm text-slate-600">{comprasDin.length} compra(s) somando {formatBRL(r.totalCompras)} (saíram da gaveta)</div>}
           </div>
+
+          {/* compras em PIX (não afetam o caixa físico) */}
+          {comprasPix.length > 0 ? (
+            <div className="rounded-2xl border border-dashed bg-white p-3 text-sm text-slate-500">
+              💳 {comprasPix.length} compra(s) via <b>PIX</b> somando {formatBRL(totalPix)} — não saíram da gaveta, não entram no caixa físico.
+            </div>
+          ) : null}
 
           {/* lançamentos manuais */}
           <div className="rounded-2xl border bg-white">

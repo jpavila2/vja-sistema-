@@ -8,7 +8,7 @@ export default async function ConferenciaPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("purchases")
-    .select("id, total, status, data_hora, observacoes, people(nome), purchase_items(id, peso_liquido, preco_unitario, subtotal, materials(nome, emoji, unidade))")
+    .select("id, total, status, forma_pagamento, data_hora, observacoes, people(nome), purchase_items(id, peso_liquido, preco_unitario, subtotal, materials(nome, emoji, unidade))")
     .gte("data_hora", inicio).lt("data_hora", fim)
     .order("data_hora", { ascending: false });
   return (
