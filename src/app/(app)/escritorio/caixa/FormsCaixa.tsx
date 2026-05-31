@@ -31,13 +31,16 @@ export function FormDespesa({ dia }: { dia: string }) {
     <form action={lancarMovimento} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="dia" value={dia} />
       <input type="hidden" name="tipo" value="despesa" />
-      <select name="categoria" className={inp}>
-        <option>Combustível</option>
-        <option>Segurança</option>
-        <option>Alimentação / Café</option>
-        <option>Manutenção / Pedágio</option>
-        <option>Outros</option>
-      </select>
+      <input name="categoria" list="categorias-despesa" placeholder="Categoria" className={inp} required />
+      <datalist id="categorias-despesa">
+        <option value="Combustível" />
+        <option value="Segurança" />
+        <option value="Alimentação / Café" />
+        <option value="Manutenção / Pedágio" />
+        <option value="Salário / Diária" />
+        <option value="Aluguel" />
+        <option value="Outros" />
+      </datalist>
       <input name="descricao" placeholder="Descrição (ex: caminhão branco)" className={inp} />
       <input name="valor" inputMode="decimal" placeholder="Valor" className={inp + " w-28"} />
       <button className={btnTeal}>+ Despesa (saída)</button>

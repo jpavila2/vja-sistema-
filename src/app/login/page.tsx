@@ -25,7 +25,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
       <form action={formAction} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow">
         <Logo className="justify-center" />
-        <p className="text-center text-sm text-slate-500">Gestão de sucata</p>
+        <p className="text-center text-sm text-slate-500">Gestão de reciclagem</p>
         <input name="email" type="email" required placeholder="E-mail"
           className="w-full rounded-xl border p-3 text-lg" />
         <input name="senha" type="password" required placeholder="Senha"

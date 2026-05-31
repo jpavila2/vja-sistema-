@@ -5,7 +5,7 @@ import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { conferirCompra, cancelarCompra } from "./actions";
 
 type Item = { id: number; peso_liquido: number; preco_unitario: number; subtotal: number; materials: { nome: string; emoji: string | null; unidade: string } | null };
-type Compra = { id: number; total: number; status: string; data_hora: string; observacoes: string | null; people: { nome: string } | null; purchase_items: Item[] };
+type Compra = { id: number; total: number; status: string; forma_pagamento: string; data_hora: string; observacoes: string | null; people: { nome: string } | null; purchase_items: Item[] };
 
 const BADGE: Record<string, string> = {
   pendente: "bg-marca-gold-light text-marca-gold",
@@ -27,6 +27,11 @@ export function ListaConferencia({ compras }: { compras: Compra[] }) {
             <span className="text-sm text-slate-500">
               {new Date(c.data_hora).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
             </span>
+            {c.status !== "pendente" ? (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
+                {c.forma_pagamento === "pix" ? "PIX" : "Dinheiro"}
+              </span>
+            ) : null}
             <span className="ml-auto text-xl font-black text-marca-navy">{formatBRL(c.total)}</span>
           </div>
           <ul className="mt-2 space-y-0.5 text-sm text-slate-600">
@@ -38,8 +43,12 @@ export function ListaConferencia({ compras }: { compras: Compra[] }) {
           </ul>
           {c.status === "pendente" ? (
             <div className="mt-3 flex gap-2">
-              <form action={conferirCompra}>
+              <form action={conferirCompra} className="flex items-center gap-2">
                 <input type="hidden" name="id" value={c.id} />
+                <select name="forma_pagamento" defaultValue="dinheiro" className="rounded-full border px-3 py-2 text-sm font-semibold">
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="pix">PIX</option>
+                </select>
                 <button className="rounded-full bg-marca-teal px-4 py-2 text-sm font-bold text-white hover:bg-marca-teal-dark">
                   ✓ Conferir
                 </button>
