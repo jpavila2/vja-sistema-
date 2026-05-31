@@ -27,3 +27,14 @@ export type Pessoa = {
   observacoes: string | null;
   status: StatusPessoa;
 };
+
+export type ItemCesta = {
+  material_id: number;
+  nome: string;
+  emoji: string | null;
+  unidade: Unidade;
+  preco_unitario: number;
+  peso_bruto: number;
+  peso_liquido: number;
+  subtotal: number;
+};
