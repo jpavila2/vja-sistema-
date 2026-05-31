@@ -11,6 +11,7 @@ O MVP (Fase 1) foi quebrado em 4 planos sequenciais. Cada um entrega software qu
 | 2 | Materiais + Pessoas (CRM) | Cadastrar/listar/editar/buscar materiais e pessoas | `2026-05-30-mvp-fase1-02-materiais-pessoas.md` |
 | 3 | Compras + Estoque | Lançar compra touch com vários itens; estoque sobe via `stock_movements` | `2026-05-31-mvp-fase1-03-compras-estoque.md` |
 | 4 | Conferência + Caixa + Painel | Conferir/cancelar compras; caixa do dia automático; painel admin | `2026-05-31-mvp-fase1-04-conferencia-caixa.md` |
+| 5 | (Fase 2) Ajustes balança + Caixa físico | Impureza %, catador rápido/avulso, fluxo de caixa em dinheiro com fechamento | `2026-05-31-fase2-05-balanca-caixa-fisico.md` |
 
 **Convenção de execução:** cada plano usa `superpowers:subagent-driven-development` ou
 `superpowers:executing-plans`. Passos com checkbox `- [ ]`.
