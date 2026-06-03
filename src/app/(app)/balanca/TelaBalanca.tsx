@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
 import { calcTotalCompra } from "@/lib/compra";
 import { registrarCompra } from "./actions";
+import { buscarCatadores, resolverCatador, type CatadorOpt } from "@/lib/catador";
 import type { Material, ItemCesta, Pessoa } from "@/lib/types";
 
 type Props = {
@@ -23,10 +24,19 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const [pctStr, setPctStr] = useState(""); // campo custom
   const [modo, setModo] = useState<ModoCatador>("conhecido");
   const [busca, setBusca] = useState("");
+  const [catadorSel, setCatadorSel] = useState<CatadorOpt | null>(null);
+  const [mostrarSug, setMostrarSug] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [novoTel, setNovoTel] = useState("");
   const [msg, setMsg] = useState("");
+  const [reqId, setReqId] = useState<string>(() => crypto.randomUUID());
   const [pending, startTransition] = useTransition();
+
+  // catador resolvido para exibir "Pagando para" e travar lançamento no errado
+  const sugestoes = buscarCatadores(fornecedores, busca);
+  const resol = resolverCatador(fornecedores, busca);
+  const catadorEfetivo: CatadorOpt | null =
+    catadorSel ?? (resol.tipo === "ok" ? { id: resol.id, nome: resol.nome } : null);
 
   const peso = parseFloat(pesoStr.replace(",", ".")) || 0;
   const liquido = r3(peso * (1 - pct / 100));
@@ -56,7 +66,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   }
   function remover(i: number) { setCesta((c) => c.filter((_, idx) => idx !== i)); }
 
-  function resolverCatador(): { pessoa_id: number | null; nome: string; tel: string } | null {
+  function obterCatadorPayload(): { pessoa_id: number | null; nome: string; tel: string } | null {
     if (modo === "avulso") {
       if (avulsoId) return { pessoa_id: avulsoId, nome: "", tel: "" };
       return { pessoa_id: null, nome: "Avulso", tel: "" };
@@ -65,27 +75,38 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
       if (novoNome.trim() === "") return null;
       return { pessoa_id: null, nome: novoNome.trim(), tel: novoTel.trim() };
     }
-    const achado = fornecedores.find(
-      (f) => f.nome.trim().toLowerCase() === busca.trim().toLowerCase()
-    );
-    if (!achado) return null;
-    return { pessoa_id: achado.id, nome: "", tel: "" };
+    if (catadorEfetivo) return { pessoa_id: catadorEfetivo.id, nome: "", tel: "" };
+    return null;
+  }
+
+  function msgCatador(): string {
+    if (modo === "novo") return "Digite o nome do catador";
+    if (resol.tipo === "ambiguo") return "Há mais de um catador com esse nome — toque no certo na lista";
+    return "Toque no nome do catador na lista ou use o + para cadastrar";
   }
 
   function finalizar() {
+    if (pending) return; // trava duplo-clique
     if (cesta.length === 0) return;
-    const cat = resolverCatador();
-    if (!cat) { setMsg("Escolha ou cadastre o catador"); return; }
+    const cat = obterCatadorPayload();
+    if (!cat) { setMsg(msgCatador()); return; }
     startTransition(async () => {
-      const res = await registrarCompra({
-        pessoa_id: cat.pessoa_id, catador_nome: cat.nome, catador_telefone: cat.tel,
-        observacoes: "",
-        itens: cesta.map((i) => ({ material_id: i.material_id, peso_bruto: i.peso_bruto, peso_liquido: i.peso_liquido, preco_unitario: i.preco_unitario })),
-      });
-      if (res.ok) {
-        setMsg(`✅ Compra salva — ${formatBRL(total)}`);
-        setCesta([]); setNovoNome(""); setNovoTel(""); setBusca("");
-      } else setMsg("Erro: " + res.erro);
+      try {
+        const res = await registrarCompra({
+          pessoa_id: cat.pessoa_id, catador_nome: cat.nome, catador_telefone: cat.tel,
+          observacoes: "",
+          itens: cesta.map((i) => ({ material_id: i.material_id, peso_bruto: i.peso_bruto, peso_liquido: i.peso_liquido, preco_unitario: i.preco_unitario })),
+          client_request_id: reqId,
+        });
+        if (res.ok) {
+          setMsg(`✅ Compra salva — ${formatBRL(total)}`);
+          setCesta([]); setNovoNome(""); setNovoTel(""); setBusca("");
+          setCatadorSel(null); setMostrarSug(false); setModo("conhecido");
+          setReqId(crypto.randomUUID()); // nova chave para a próxima compra
+        } else setMsg("Erro: " + res.erro);
+      } catch (e) {
+        setMsg("Erro ao salvar — tente de novo. " + (e instanceof Error ? e.message : ""));
+      }
     });
   }
 
@@ -103,24 +124,48 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
           <button onClick={() => setModo("avulso")} className={tab(modo === "avulso")}>Avulso</button>
         </div>
         {modo === "conhecido" ? (
-          <div className="flex gap-2">
-            <input
-              list="lista-catadores"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Digite para encontrar o catador…"
-              className="min-w-0 flex-1 rounded-xl border p-3 text-base"
-            />
-            <datalist id="lista-catadores">
-              {fornecedores.map((f) => <option key={f.id} value={f.nome} />)}
-            </datalist>
-            <button
-              type="button"
-              onClick={() => { setNovoNome(busca.trim()); setModo("novo"); }}
-              title="Cadastrar novo catador"
-              className="shrink-0 rounded-xl bg-marca-teal px-5 text-2xl font-black text-white active:scale-95">
-              +
-            </button>
+          <div className="relative">
+            <div className="flex gap-2">
+              <input
+                aria-label="Buscar catador"
+                value={busca}
+                onChange={(e) => { setBusca(e.target.value); setCatadorSel(null); setMostrarSug(true); }}
+                onFocus={() => setMostrarSug(true)}
+                placeholder="Digite para encontrar o catador…"
+                className="min-w-0 flex-1 rounded-xl border p-3 text-base"
+              />
+              <button
+                type="button"
+                onClick={() => { setNovoNome(busca.trim()); setMostrarSug(false); setModo("novo"); }}
+                title="Cadastrar novo catador"
+                aria-label="Cadastrar novo catador"
+                className="shrink-0 rounded-xl bg-marca-teal px-5 text-2xl font-black text-white active:scale-95">
+                +
+              </button>
+            </div>
+            {mostrarSug && !catadorSel && sugestoes.length > 0 ? (
+              <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-xl border bg-white shadow-lg">
+                {sugestoes.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onClick={() => { setCatadorSel(s); setBusca(s.nome); setMostrarSug(false); }}
+                      className="block w-full px-4 py-3 text-left text-base hover:bg-marca-teal-light">
+                      {s.nome}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {catadorEfetivo ? (
+              <p className="mt-2 text-sm font-bold text-marca-teal-dark">Pagando para: {catadorEfetivo.nome}</p>
+            ) : busca.trim() !== "" ? (
+              <p className="mt-2 text-sm text-amber-600">
+                {resol.tipo === "ambiguo"
+                  ? "Mais de um catador com esse nome — toque no certo na lista."
+                  : "Toque no nome na lista ou use o + para cadastrar."}
+              </p>
+            ) : null}
           </div>
         ) : modo === "novo" ? (
           <div className="flex flex-wrap gap-2">
