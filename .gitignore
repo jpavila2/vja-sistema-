@@ -28,8 +28,8 @@ yarn-error.log*
 # local env files
 .env*.local
 
-# vercel
-.vercel
+# vercel — manter .vercel/project.json para referência do projeto
+# .vercel
 
 # typescript
 *.tsbuildinfo
@@ -38,3 +38,10 @@ next-env.d.ts
 # tooling local (nao versionar)
 .claude/
 .playwright-mcp/
+
+# apresentacao: dependencias e screenshots gerados
+apresentacao/node_modules/
+apresentacao/package-lock.json
+
+# screenshots de teste E2E (gerados durante verificacao)
+*.png
