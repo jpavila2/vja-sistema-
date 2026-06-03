@@ -14,6 +14,7 @@ export type Material = {
   ativo: boolean;
   mostrar_balanca: boolean;
   mostrar_venda: boolean;
+  ordem_balanca: number;
 };
 
 export type TipoPessoa = "cliente" | "fornecedor" | "ambos";
