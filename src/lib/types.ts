@@ -1,4 +1,4 @@
-export type Categoria = "metal" | "plastico" | "papel" | "eletronico" | "outros";
+export type Categoria = "metal" | "material_fino" | "plastico" | "papel" | "eletronico" | "outros";
 export type Unidade = "kg" | "ton" | "un";
 
 export type Material = {

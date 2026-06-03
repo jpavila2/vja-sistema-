@@ -5,7 +5,16 @@ import { TabelaBusca } from "@/components/TabelaBusca";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { formatBRL } from "@/lib/format";
 import { alternarAtivoMaterial } from "./actions";
-import type { Material } from "@/lib/types";
+import type { Material, Categoria } from "@/lib/types";
+
+const CATEGORIA_LABEL: Record<Categoria, string> = {
+  metal: "Metal/Pesado",
+  material_fino: "Material Fino",
+  plastico: "Plástico",
+  papel: "Papel",
+  eletronico: "Eletrônico",
+  outros: "Outros",
+};
 
 export function MateriaisLista({ materiais }: { materiais: Material[] }) {
   return (
@@ -16,7 +25,7 @@ export function MateriaisLista({ materiais }: { materiais: Material[] }) {
       vazio="Nenhum material cadastrado."
       colunas={[
         { titulo: "Material", render: (m) => <span>{m.emoji} {m.nome}</span> },
-        { titulo: "Categoria", render: (m) => m.categoria },
+        { titulo: "Categoria", render: (m) => CATEGORIA_LABEL[m.categoria] ?? m.categoria },
         { titulo: "Preço compra", render: (m) => formatBRL(m.preco_compra) },
         { titulo: "Preço venda", render: (m) => formatBRL(m.preco_venda) },
         {

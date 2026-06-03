@@ -7,7 +7,7 @@ const checkbox = z.preprocess(
 
 export const materialSchema = z.object({
   nome: z.string().trim().min(2, "Nome muito curto"),
-  categoria: z.enum(["metal", "plastico", "papel", "eletronico", "outros"]),
+  categoria: z.enum(["metal", "material_fino", "plastico", "papel", "eletronico", "outros"]),
   unidade: z.enum(["kg", "ton", "un"]),
   preco_compra: z.coerce.number().min(0, "Preço não pode ser negativo"),
   preco_venda: z.coerce.number().min(0, "Preço não pode ser negativo").default(0),

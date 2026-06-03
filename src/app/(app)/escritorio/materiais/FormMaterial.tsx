@@ -28,7 +28,8 @@ export function FormMaterial({ material }: { material?: Material }) {
       </Campo>
       <Campo label="Categoria">
         <select name="categoria" defaultValue={material?.categoria ?? "metal"} className={inputCls}>
-          <option value="metal">Metal</option>
+          <option value="metal">Metal / Pesado (ferro)</option>
+          <option value="material_fino">Material Fino (não-ferroso)</option>
           <option value="plastico">Plástico</option>
           <option value="papel">Papel</option>
           <option value="eletronico">Eletrônico</option>
