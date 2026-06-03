@@ -42,16 +42,36 @@ export function FormMaterial({ material }: { material?: Material }) {
           <option value="un">unidade</option>
         </select>
       </Campo>
-      <Campo label="Preço de compra (R$)">
-        <input name="preco_compra" type="number" step="0.01" min="0"
-          defaultValue={material?.preco_compra ?? 0} className={inputCls} />
-      </Campo>
+      <div className="grid grid-cols-2 gap-3">
+        <Campo label="Preço de compra (R$)">
+          <input name="preco_compra" type="number" step="0.01" min="0"
+            defaultValue={material?.preco_compra ?? 0} className={inputCls} />
+        </Campo>
+        <Campo label="Preço de venda (R$)">
+          <input name="preco_venda" type="number" step="0.01" min="0"
+            defaultValue={material?.preco_venda ?? 0} className={inputCls} />
+        </Campo>
+      </div>
       <Campo label="Estoque mínimo">
         <input name="estoque_minimo" type="number" step="0.001" min="0"
           defaultValue={material?.estoque_minimo ?? 0} className={inputCls} />
       </Campo>
       <Campo label="Emoji (opcional)">
         <input name="emoji" maxLength={8} defaultValue={material?.emoji ?? ""} className={inputCls} />
+      </Campo>
+      <Campo label="Onde aparece">
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-base">
+            <input type="checkbox" name="mostrar_balanca" value="true"
+              defaultChecked={material?.mostrar_balanca ?? true} className="h-5 w-5" />
+            <span>⚖️ Balança (compra do catador)</span>
+          </label>
+          <label className="flex items-center gap-2 text-base">
+            <input type="checkbox" name="mostrar_venda" value="true"
+              defaultChecked={material?.mostrar_venda ?? true} className="h-5 w-5" />
+            <span>📦 Vendas</span>
+          </label>
+        </div>
       </Campo>
       {state?.erro ? <p className="text-sm text-red-600">{state.erro}</p> : null}
       <Salvar />

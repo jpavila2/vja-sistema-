@@ -12,6 +12,8 @@ export type Material = {
   estoque_minimo: number;
   emoji: string | null;
   ativo: boolean;
+  mostrar_balanca: boolean;
+  mostrar_venda: boolean;
 };
 
 export type TipoPessoa = "cliente" | "fornecedor" | "ambos";

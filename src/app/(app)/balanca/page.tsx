@@ -5,7 +5,7 @@ import type { Material, Pessoa } from "@/lib/types";
 export default async function BalancaPage() {
   const supabase = await createClient();
   const [{ data: materiais }, { data: pessoas }] = await Promise.all([
-    supabase.from("materials").select("*").eq("ativo", true).order("nome"),
+    supabase.from("materials").select("*").eq("ativo", true).eq("mostrar_balanca", true).order("nome"),
     supabase.from("people").select("id, nome").in("tipo", ["fornecedor", "ambos"]).eq("status", "ativo").order("nome"),
   ]);
   const todas = (pessoas as Pick<Pessoa, "id" | "nome">[]) ?? [];

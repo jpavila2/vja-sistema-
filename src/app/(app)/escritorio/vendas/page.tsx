@@ -17,7 +17,7 @@ export default async function VendasPage() {
     { data: vendasData },
     { data: profData },
   ] = await Promise.all([
-    supabase.from("materials").select("*").eq("ativo", true).order("categoria").order("nome"),
+    supabase.from("materials").select("*").eq("ativo", true).eq("mostrar_venda", true).order("categoria").order("nome"),
     supabase.from("people").select("id, nome").in("tipo", ["cliente","ambos"]).eq("status","ativo").order("nome"),
     supabase
       .from("sales")

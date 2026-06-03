@@ -18,6 +18,16 @@ export function MateriaisLista({ materiais }: { materiais: Material[] }) {
         { titulo: "Material", render: (m) => <span>{m.emoji} {m.nome}</span> },
         { titulo: "Categoria", render: (m) => m.categoria },
         { titulo: "Preço compra", render: (m) => formatBRL(m.preco_compra) },
+        { titulo: "Preço venda", render: (m) => formatBRL(m.preco_venda) },
+        {
+          titulo: "Aparece em",
+          render: (m) => (
+            <span className="text-sm">
+              {m.mostrar_balanca ? "⚖️" : ""}{m.mostrar_venda ? "📦" : ""}
+              {!m.mostrar_balanca && !m.mostrar_venda ? "—" : ""}
+            </span>
+          ),
+        },
         { titulo: "Estoque", render: (m) => `${m.estoque_atual} ${m.unidade}` },
         {
           titulo: "Status",
