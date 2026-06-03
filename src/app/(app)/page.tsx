@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { hojeBR, limitesDoDiaBR, limitesMesBR, nomeMesAtual } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
 import { CardResumo } from "@/components/CardResumo";
+import { GraficoEntrouSaiu } from "@/components/GraficoEntrouSaiu";
+import { GraficoDespesas } from "@/components/GraficoDespesas";
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -10,12 +12,17 @@ export default async function PainelPage() {
   const hoje = hojeBR();
   const { inicio: inicioDia, fim: fimDia } = limitesDoDiaBR(hoje);
   const { inicio: inicioMes, fim: fimMes }  = limitesMesBR();
+  // bounds do mês para a coluna `dia` (date) de cash_movements
+  const [anoM, mesM] = hoje.split("-").map(Number);
+  const diaIniMes = `${anoM}-${String(mesM).padStart(2, "0")}-01`;
+  const diaFimMes = mesM === 12 ? `${anoM + 1}-01-01` : `${anoM}-${String(mesM + 1).padStart(2, "0")}-01`;
   const supabase = await createClient();
 
   const [
     { data: comprasHoje },
     { data: comprasMes },
     { data: vendasMes },
+    { data: despesasMes },
     { data: materiaisData },
     { data: sessoesData },
     { data: profData },
@@ -29,6 +36,9 @@ export default async function PainelPage() {
     // vendas do MÊS
     supabase.from("sales").select("total, status")
       .gte("data_hora", inicioMes).lt("data_hora", fimMes),
+    // despesas do MÊS (cash_movements tipo=despesa)
+    supabase.from("cash_movements").select("valor, categoria")
+      .eq("tipo", "despesa").gte("dia", diaIniMes).lt("dia", diaFimMes),
     // estoque atual
     supabase.from("materials").select("id, nome, emoji, unidade, estoque_atual, estoque_minimo, categoria")
       .eq("ativo", true).order("categoria").order("nome"),
@@ -49,10 +59,25 @@ export default async function PainelPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vM = ((vendasMes   as any[]) ?? []).filter((v) => v.status !== "cancelada");
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dM = (despesasMes as any[]) ?? [];
+
   const totalCompradoHoje = r2(cH.reduce((s: number, c: {total: number}) => s + Number(c.total), 0));
   const totalCompradoMes  = r2(cM.reduce((s: number, c: {total: number}) => s + Number(c.total), 0));
   const totalVendidoMes   = r2(vM.reduce((s: number, v: {total: number}) => s + Number(v.total), 0));
-  const resultadoBruto    = r2(totalVendidoMes - totalCompradoMes);
+  const totalDespesasMes  = r2(dM.reduce((s: number, d: {valor: number}) => s + Number(d.valor), 0));
+  // Resultado de verdade: o que entrou menos tudo que saiu (compras E despesas).
+  const resultadoLiquido  = r2(totalVendidoMes - totalCompradoMes - totalDespesasMes);
+
+  // Despesas agrupadas por categoria (pro gráfico)
+  const despesasPorCategoria = Object.values(
+    dM.reduce((acc: Record<string, { categoria: string; valor: number }>, d: { valor: number; categoria: string | null }) => {
+      const cat = d.categoria?.trim() || "Sem categoria";
+      acc[cat] ??= { categoria: cat, valor: 0 };
+      acc[cat].valor = r2(acc[cat].valor + Number(d.valor));
+      return acc;
+    }, {}),
+  ) as { categoria: string; valor: number }[];
 
   // ── Estoque ────────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,15 +151,39 @@ export default async function PainelPage() {
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
           {nomeMesAtual()} (mês corrente)
         </h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <CardResumo titulo="Total comprado" valor={formatBRL(totalCompradoMes)} cor="gold" />
-          <CardResumo titulo="Total vendido" valor={formatBRL(totalVendidoMes)} cor="green" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <CardResumo titulo="Vendido" valor={formatBRL(totalVendidoMes)} cor="green" />
+          <CardResumo titulo="Comprado" valor={formatBRL(totalCompradoMes)} cor="gold" />
+          <CardResumo titulo="Despesas" valor={formatBRL(totalDespesasMes)} cor="navy" />
           <CardResumo
-            titulo="Resultado bruto"
-            valor={formatBRL(Math.abs(resultadoBruto))}
-            cor={resultadoBruto >= 0 ? "green" : "gold"}
-            sufixo={resultadoBruto >= 0 ? "▲" : "▼ negativo"}
+            titulo="Resultado do mês"
+            valor={formatBRL(Math.abs(resultadoLiquido))}
+            cor={resultadoLiquido >= 0 ? "green" : "gold"}
+            sufixo={resultadoLiquido >= 0 ? "▲ lucro" : "▼ no vermelho"}
           />
+        </div>
+
+        {/* gráficos */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <div className="mb-1 font-bold text-marca-navy">Entrou × Saiu</div>
+            <p className="mb-4 text-xs text-slate-500">
+              Vendido {formatBRL(totalVendidoMes)} − Comprado {formatBRL(totalCompradoMes)} − Despesas {formatBRL(totalDespesasMes)} ={" "}
+              <b className={resultadoLiquido >= 0 ? "text-marca-green-dark" : "text-rose-600"}>
+                {formatBRL(resultadoLiquido)}
+              </b>
+            </p>
+            <GraficoEntrouSaiu
+              vendido={totalVendidoMes}
+              comprado={totalCompradoMes}
+              despesas={totalDespesasMes}
+            />
+          </div>
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <div className="mb-1 font-bold text-marca-navy">Despesas por categoria</div>
+            <p className="mb-4 text-xs text-slate-500">Pra onde o dinheiro foi neste mês.</p>
+            <GraficoDespesas itens={despesasPorCategoria} />
+          </div>
         </div>
       </section>
 
