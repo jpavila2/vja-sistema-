@@ -20,6 +20,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const [cesta, setCesta] = useState<ItemCesta[]>([]);
   const [sel, setSel] = useState<Material | null>(null);
   const [pesoStr, setPesoStr] = useState("0");
+  const [precoStr, setPrecoStr] = useState(""); // preço de compra editável (preço especial)
   const [pct, setPct] = useState(0); // % de impureza
   const [pctStr, setPctStr] = useState(""); // campo custom
   const [modo, setModo] = useState<ModoCatador>("conhecido");
@@ -40,11 +41,13 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
 
   const peso = parseFloat(pesoStr.replace(",", ".")) || 0;
   const liquido = r3(peso * (1 - pct / 100));
-  const valorAtual = sel ? calcSubtotal(liquido, sel.preco_compra) : 0;
+  const precoEdit = parseFloat(precoStr.replace(",", ".")) || 0;
+  const valorAtual = sel ? calcSubtotal(liquido, precoEdit) : 0;
   const total = useMemo(() => calcTotalCompra(cesta), [cesta]);
 
   function abrir(m: Material) {
     setSel(m); setPesoStr("0"); setPct(0); setPctStr("");
+    setPrecoStr(m.preco_compra > 0 ? String(m.preco_compra) : "");
   }
   function tecla(k: string) {
     setPesoStr((c) => (k === "back" ? (c.length > 1 ? c.slice(0, -1) : "0") : k === "," ? (c.includes(",") ? c : c + ",") : c === "0" ? k : c + k));
@@ -57,10 +60,11 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   }
   function adicionar() {
     if (!sel || liquido <= 0) { setMsg("Digite o peso"); return; }
+    if (precoEdit < 0) { setMsg("Preço inválido"); return; }
     setCesta((c) => [...c, {
       material_id: sel.id, nome: sel.nome, emoji: sel.emoji, unidade: sel.unidade,
-      preco_unitario: sel.preco_compra, peso_bruto: peso, peso_liquido: liquido,
-      subtotal: calcSubtotal(liquido, sel.preco_compra),
+      preco_unitario: precoEdit, peso_bruto: peso, peso_liquido: liquido,
+      subtotal: calcSubtotal(liquido, precoEdit),
     }]);
     setSel(null); setMsg("");
   }
@@ -231,7 +235,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
             <div className="mb-3 flex items-center gap-3">
               <span className="text-3xl">{sel.emoji}</span>
               <span className="text-2xl font-black">{sel.nome}</span>
-              <span className="ml-auto font-bold text-marca-teal-dark">{formatBRL(sel.preco_compra)}/{sel.unidade}</span>
+              <span className="ml-auto text-sm font-bold text-slate-400">tabela {formatBRL(sel.preco_compra)}/{sel.unidade}</span>
             </div>
             <div className="mb-3 grid grid-cols-2 gap-3">
               <div className="rounded-xl bg-slate-100 p-3 text-center">
@@ -242,6 +246,24 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
                 <div className="text-xs font-bold uppercase text-slate-500">Valor (líq. {liquido.toLocaleString("pt-BR")})</div>
                 <div className="text-4xl font-black text-marca-teal-dark">{formatBRL(valorAtual)}</div>
               </div>
+            </div>
+            {/* preço de compra editável (preço especial pro catador) */}
+            <div className="mb-3 flex items-center gap-2">
+              <label className="text-sm font-bold text-slate-600">Preço (R$/{sel.unidade}):</label>
+              <input
+                inputMode="decimal"
+                value={precoStr}
+                onChange={(e) => setPrecoStr(e.target.value)}
+                aria-label="Preço de compra"
+                placeholder={sel.preco_compra > 0 ? String(sel.preco_compra) : "0,00"}
+                className="w-28 rounded-lg border p-2 text-center text-lg font-bold"
+              />
+              {precoEdit !== sel.preco_compra ? (
+                <button type="button" onClick={() => setPrecoStr(String(sel.preco_compra))}
+                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-600">
+                  ↺ tabela
+                </button>
+              ) : null}
             </div>
             {/* impureza % */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
