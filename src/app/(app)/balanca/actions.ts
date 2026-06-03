@@ -16,13 +16,15 @@ const compraSchema = z.object({
   catador_telefone: z.string().trim().default(""),
   observacoes: z.string().trim().default(""),
   itens: z.array(itemSchema).min(1, "Compra sem itens"),
+  // chave de idempotência: evita compra duplicada em duplo-clique/retry
+  client_request_id: z.string().uuid().optional(),
 });
 export type ResultadoCompra = { ok: true; id: number } | { ok: false; erro: string };
 
 export async function registrarCompra(payload: unknown): Promise<ResultadoCompra> {
   const parsed = compraSchema.safeParse(payload);
   if (!parsed.success) return { ok: false, erro: parsed.error.issues[0]?.message ?? "Dados inválidos" };
-  const { pessoa_id, catador_nome, catador_telefone, observacoes, itens } = parsed.data;
+  const { pessoa_id, catador_nome, catador_telefone, observacoes, itens, client_request_id } = parsed.data;
   if (pessoa_id === null && catador_nome === "") return { ok: false, erro: "Informe o catador" };
 
   const supabase = await createClient();
@@ -32,6 +34,7 @@ export async function registrarCompra(payload: unknown): Promise<ResultadoCompra
     p_catador_telefone: catador_telefone,
     p_observacoes: observacoes,
     p_itens: itens,
+    p_client_request_id: client_request_id ?? null,
   });
   if (error) return { ok: false, erro: error.message };
   revalidatePath("/balanca");
