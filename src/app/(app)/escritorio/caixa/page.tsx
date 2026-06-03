@@ -12,28 +12,44 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
   const { inicio, fim } = limitesDoDiaBR(dia);
   const supabase = await createClient();
 
-  const [{ data: sessao }, { data: movs }, { data: compras }, { data: comprasPixData }] = await Promise.all([
+  const [
+    { data: sessao },
+    { data: movs },
+    { data: comprasData },
+    { data: comprasPixData },
+    { data: vendasDinData },
+    { data: vendasOutrasData },
+  ] = await Promise.all([
     supabase.from("cash_sessions").select("*").eq("dia", dia).maybeSingle(),
     supabase.from("cash_movements").select("*").eq("dia", dia).order("created_at"),
     supabase.from("purchases").select("total, status").eq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
     supabase.from("purchases").select("total, status").eq("forma_pagamento", "pix").gte("data_hora", inicio).lt("data_hora", fim),
+    supabase.from("sales").select("total, status, people(nome)").eq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
+    supabase.from("sales").select("total, status, forma_pagamento, people(nome)").neq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const movimentos = (movs as any[]) ?? [];
-  const saques = movimentos.filter((m) => m.tipo === "saque");
-  const despesas = movimentos.filter((m) => m.tipo === "despesa");
+  const saques    = movimentos.filter((m) => m.tipo === "saque");
+  const despesas  = movimentos.filter((m) => m.tipo === "despesa");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const comprasDin = ((compras as any[]) ?? []).filter((c) => c.status !== "cancelada");
+  const comprasDin  = ((comprasData  as any[]) ?? []).filter((c) => c.status !== "cancelada");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const comprasPix = ((comprasPixData as any[]) ?? []).filter((c) => c.status !== "cancelada");
-  const totalPix = Math.round(comprasPix.reduce((s, c) => s + Number(c.total), 0) * 100) / 100;
+  const comprasPix  = ((comprasPixData as any[]) ?? []).filter((c) => c.status !== "cancelada");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vendasDin   = ((vendasDinData  as any[]) ?? []).filter((v) => v.status !== "cancelada");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vendasOutras = ((vendasOutrasData as any[]) ?? []).filter((v) => v.status !== "cancelada");
+
+  const totalPixCompras  = Math.round(comprasPix.reduce((s: number, c: {total:number}) => s + Number(c.total), 0) * 100) / 100;
+  const totalVendasOutras = Math.round(vendasOutras.reduce((s: number, v: {total:number}) => s + Number(v.total), 0) * 100) / 100;
 
   const r = calcularSaldoCaixa({
     saldoInicial: sessao?.saldo_inicial ?? 0,
-    saques: saques.map((m) => Number(m.valor)),
-    comprasDinheiro: comprasDin.map((c) => Number(c.total)),
-    despesas: despesas.map((m) => Number(m.valor)),
+    saques:          saques.map((m) => Number(m.valor)),
+    comprasDinheiro: comprasDin.map((c: {total:number}) => Number(c.total)),
+    despesas:        despesas.map((m) => Number(m.valor)),
+    vendasDinheiro:  vendasDin.map((v: {total:number}) => Number(v.total)),
     contado: sessao?.saldo_contado ?? undefined,
   });
 
@@ -51,19 +67,26 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <CardResumo titulo="Saldo inicial" valor={formatBRL(sessao.saldo_inicial)} cor="navy" />
-            <CardResumo titulo="Saques (entrada)" valor={formatBRL(r.totalSaques)} cor="green" />
-            <CardResumo titulo="Saídas (compras+despesas)" valor={formatBRL(r.totalCompras + r.totalDespesas)} cor="gold" />
+            <CardResumo titulo="Entradas (saques + vendas din.)" valor={formatBRL(r.totalSaques + r.totalVendas)} cor="green" />
+            <CardResumo titulo="Saídas (compras + despesas)" valor={formatBRL(r.totalCompras + r.totalDespesas)} cor="gold" />
             <CardResumo titulo="Saldo calculado" valor={formatBRL(r.saldoCalculado)} cor="teal" />
           </div>
 
           {sessao.status === "fechado" ? (
             <div className="rounded-2xl border bg-white p-4">
               <div className="font-bold text-marca-navy">Caixa fechado</div>
-              <div className="text-sm">Contado: <b>{formatBRL(sessao.saldo_contado)}</b> · Diferença:{" "}
-                <b className={(r.diferenca ?? 0) === 0 ? "text-marca-green-dark" : "text-red-600"}>
-                  {formatBRL(r.diferenca ?? 0)} {(r.diferenca ?? 0) > 0 ? "(sobra)" : (r.diferenca ?? 0) < 0 ? "(falta)" : ""}
+              <div className="text-sm">
+                Contado: <b>{formatBRL(sessao.saldo_contado)}</b>
+                {" · "}Calculado: <b>{formatBRL(sessao.saldo_calculado ?? r.saldoCalculado)}</b>
+                {" · "}Diferença:{" "}
+                <b className={(sessao.diferenca ?? r.diferenca ?? 0) === 0
+                  ? "text-marca-green-dark"
+                  : Math.abs(sessao.diferenca ?? r.diferenca ?? 0) > 100
+                    ? "text-red-600" : "text-amber-600"}>
+                  {formatBRL(sessao.diferenca ?? r.diferenca ?? 0)}{" "}
+                  {(sessao.diferenca ?? 0) > 0 ? "(sobra)" : (sessao.diferenca ?? 0) < 0 ? "(falta)" : ""}
                 </b>
               </div>
             </div>
@@ -75,17 +98,30 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
             </div>
           )}
 
-          {/* compras em dinheiro (auto) */}
+          {/* compras em dinheiro */}
           <div className="rounded-2xl border bg-white">
-            <div className="border-b bg-slate-50 p-3 font-bold text-marca-navy">Compras em dinheiro (automático) — {formatBRL(r.totalCompras)}</div>
-            {comprasDin.length === 0 ? <div className="p-4 text-center text-slate-400">Nenhuma.</div> :
-              <div className="p-3 text-sm text-slate-600">{comprasDin.length} compra(s) somando {formatBRL(r.totalCompras)} (saíram da gaveta)</div>}
+            <div className="flex items-center justify-between border-b bg-slate-50 p-3">
+              <span className="font-bold text-marca-navy">Compras em dinheiro (saiu da gaveta)</span>
+              <span className="font-bold text-red-600">−{formatBRL(r.totalCompras)}</span>
+            </div>
+            {comprasDin.length === 0
+              ? <div className="p-4 text-center text-slate-400">Nenhuma.</div>
+              : <div className="p-3 text-sm text-slate-600">{comprasDin.length} compra(s) — saíram da gaveta</div>}
           </div>
 
-          {/* compras em PIX (não afetam o caixa físico) */}
-          {comprasPix.length > 0 ? (
-            <div className="rounded-2xl border border-dashed bg-white p-3 text-sm text-slate-500">
-              💳 {comprasPix.length} compra(s) via <b>PIX</b> somando {formatBRL(totalPix)} — não saíram da gaveta, não entram no caixa físico.
+          {/* vendas em dinheiro */}
+          {vendasDin.length > 0 ? (
+            <div className="rounded-2xl border bg-white">
+              <div className="flex items-center justify-between border-b bg-marca-green-dark/10 p-3">
+                <span className="font-bold text-marca-green-dark">Vendas em dinheiro (entrou na gaveta)</span>
+                <span className="font-bold text-marca-green-dark">+{formatBRL(r.totalVendas)}</span>
+              </div>
+              {vendasDin.map((v: {total:number; people?: {nome:string}}, i: number) => (
+                <div key={i} className="flex items-center gap-2 border-b p-3 last:border-0 text-sm">
+                  <span className="text-slate-600">{v.people?.nome ?? "—"}</span>
+                  <span className="ml-auto font-bold text-marca-green-dark">{formatBRL(Number(v.total))}</span>
+                </div>
+              ))}
             </div>
           ) : null}
 
@@ -95,7 +131,8 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
             {movimentos.length === 0 ? <div className="p-4 text-center text-slate-400">Nenhum saque/despesa.</div> :
               movimentos.map((m) => (
                 <div key={m.id} className="flex items-center gap-3 border-b p-3 last:border-0">
-                  <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + (m.tipo === "saque" ? "bg-marca-green-dark/10 text-marca-green-dark" : "bg-marca-gold-light text-marca-gold")}>
+                  <span className={"rounded-full px-2 py-0.5 text-xs font-bold " +
+                    (m.tipo === "saque" ? "bg-marca-green-dark/10 text-marca-green-dark" : "bg-marca-gold-light text-marca-gold")}>
                     {m.tipo === "saque" ? "Saque" : m.categoria ?? "Despesa"}
                   </span>
                   <span className="text-slate-600">{m.descricao}</span>
@@ -103,11 +140,26 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
                     {m.tipo === "saque" ? "+" : "−"}{formatBRL(Number(m.valor))}
                   </span>
                   {sessao.status !== "fechado" ? (
-                    <BotaoConfirmar acao={removerMovimento} hidden={{ id: m.id }} mensagem="Remover este lançamento?" className="text-slate-400">🗑️</BotaoConfirmar>
+                    <BotaoConfirmar acao={removerMovimento} hidden={{ id: m.id }}
+                      mensagem="Remover este lançamento?" className="text-slate-400">🗑️</BotaoConfirmar>
                   ) : null}
                 </div>
               ))}
           </div>
+
+          {/* informativo PIX compras */}
+          {comprasPix.length > 0 ? (
+            <div className="rounded-2xl border border-dashed bg-white p-3 text-sm text-slate-500">
+              💳 {comprasPix.length} compra(s) via <b>PIX</b> somando {formatBRL(totalPixCompras)} — não saíram da gaveta.
+            </div>
+          ) : null}
+
+          {/* informativo vendas não-dinheiro */}
+          {vendasOutras.length > 0 ? (
+            <div className="rounded-2xl border border-dashed bg-white p-3 text-sm text-slate-500">
+              📲 {vendasOutras.length} venda(s) via PIX/Transferência/Boleto/Cheque somando {formatBRL(totalVendasOutras)} — não entraram na gaveta.
+            </div>
+          ) : null}
         </>
       )}
     </div>

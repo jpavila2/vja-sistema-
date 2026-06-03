@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { exigirPapel } from "@/lib/supabase/guard";
+import { limitesDoDiaBR } from "@/lib/datas";
+import { calcularSaldoCaixa } from "@/lib/caixa-fisico";
 
 /** Abre a sessão do dia (se não existir). saldo_inicial = saldo_contado do último dia fechado. */
 export async function abrirCaixa(formData: FormData) {
@@ -10,7 +12,6 @@ export async function abrirCaixa(formData: FormData) {
   const { data: ult } = await supabase.from("cash_sessions")
     .select("saldo_contado").eq("status", "fechado").lt("dia", dia)
     .order("dia", { ascending: false }).limit(1).maybeSingle();
-  // idempotente: se já existe sessão do dia, a unique(dia) faz "do nothing"
   const { error } = await supabase.from("cash_sessions").upsert(
     { dia, saldo_inicial: ult?.saldo_contado ?? 0, status: "aberto", aberto_por: user.id },
     { onConflict: "dia", ignoreDuplicates: true },
@@ -47,11 +48,46 @@ export async function fecharCaixa(formData: FormData) {
   const dia = String(formData.get("dia"));
   const contado = Number(String(formData.get("contado")).replace(",", "."));
   if (!(contado >= 0)) throw new Error("Informe o valor contado.");
+
   const { supabase, user } = await exigirPapel(["admin", "escritorio"]);
+  const { inicio, fim } = limitesDoDiaBR(dia);
+
+  // Recomputar saldo calculado no servidor para gravar diferença confiável
+  const [{ data: sessao }, { data: movs }, { data: comprasD }, { data: vendasD }] =
+    await Promise.all([
+      supabase.from("cash_sessions").select("saldo_inicial").eq("dia", dia).maybeSingle(),
+      supabase.from("cash_movements").select("tipo, valor").eq("dia", dia),
+      supabase.from("purchases").select("total, status, forma_pagamento")
+        .eq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
+      supabase.from("sales").select("total, status, forma_pagamento")
+        .eq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
+    ]);
+
+  const movimentos = (movs ?? []) as { tipo: string; valor: number }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = calcularSaldoCaixa({
+    saldoInicial: sessao?.saldo_inicial ?? 0,
+    saques:         movimentos.filter((m) => m.tipo === "saque").map((m) => Number(m.valor)),
+    comprasDinheiro: ((comprasD ?? []) as {total:number;status:string}[])
+      .filter((c) => c.status !== "cancelada").map((c) => Number(c.total)),
+    despesas:       movimentos.filter((m) => m.tipo === "despesa").map((m) => Number(m.valor)),
+    vendasDinheiro: ((vendasD ?? []) as {total:number;status:string}[])
+      .filter((v) => v.status !== "cancelada").map((v) => Number(v.total)),
+    contado,
+  });
+
   const { data, error } = await supabase.from("cash_sessions")
-    .update({ saldo_contado: contado, status: "fechado", fechado_por: user.id, fechado_em: new Date().toISOString() })
+    .update({
+      saldo_contado: contado,
+      saldo_calculado: r.saldoCalculado,
+      diferenca: r.diferenca,
+      status: "fechado",
+      fechado_por: user.id,
+      fechado_em: new Date().toISOString(),
+    })
     .eq("dia", dia).eq("status", "aberto").select("id");
   if (error) throw new Error("Não foi possível fechar o caixa: " + error.message);
   if (!data || data.length === 0) throw new Error("Caixa não está aberto para fechar.");
   revalidatePath("/escritorio/caixa");
+  revalidatePath("/");
 }

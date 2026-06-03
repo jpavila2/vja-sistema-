@@ -7,6 +7,7 @@ export type Material = {
   categoria: Categoria;
   unidade: Unidade;
   preco_compra: number;
+  preco_venda: number;
   estoque_atual: number;
   estoque_minimo: number;
   emoji: string | null;
@@ -36,5 +37,42 @@ export type ItemCesta = {
   preco_unitario: number;
   peso_bruto: number;
   peso_liquido: number;
+  subtotal: number;
+};
+
+export type FormaPagamentoVenda = "dinheiro" | "pix" | "transferencia" | "boleto" | "cheque";
+export type StatusVenda = "ativa" | "cancelada";
+
+export type Sale = {
+  id: number;
+  pessoa_id: number;
+  operador_id: string;
+  data_hora: string;
+  total: number;
+  forma_pagamento: FormaPagamentoVenda;
+  status: StatusVenda;
+  motivo_cancelamento: string | null;
+  observacoes: string | null;
+};
+
+export type SaleWithPessoa = Sale & { people: { nome: string } | null };
+
+export type SaleItem = {
+  id: number;
+  sale_id: number;
+  material_id: number;
+  peso: number;
+  preco_unitario: number;
+  subtotal: number;
+};
+
+/** Item do carrinho de vendas (antes de salvar). */
+export type ItemCarrinhoVenda = {
+  material_id: number;
+  nome: string;
+  emoji: string | null;
+  unidade: Unidade;
+  preco_unitario: number;
+  peso: number;
   subtotal: number;
 };
