@@ -29,6 +29,18 @@ export async function registrarVenda(payload: {
   }
 }
 
+export async function trocarClienteVenda(formData: FormData): Promise<void> {
+  const id = Number(formData.get("id"));
+  const pessoa_id = Number(formData.get("pessoa_id"));
+  if (!id || !pessoa_id) throw new Error("Selecione um cliente.");
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { error } = await supabase.from("sales").update({ pessoa_id }).eq("id", id);
+  if (error) throw new Error("Não foi possível trocar o cliente: " + error.message);
+  revalidatePath("/escritorio/vendas");
+  revalidatePath("/escritorio/relatorio");
+  revalidatePath("/");
+}
+
 export async function cancelarVenda(formData: FormData): Promise<void> {
   const id = Number(formData.get("id"));
   const motivo = String(formData.get("motivo") ?? "");

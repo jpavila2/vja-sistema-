@@ -4,6 +4,7 @@ import { formatBRL } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { cancelarVenda } from "./actions";
 import { TelaVendas } from "./TelaVendas";
+import { EditorClienteVenda } from "./EditorClienteVenda";
 import type { Material, Pessoa, SaleWithPessoa } from "@/lib/types";
 
 export default async function VendasPage() {
@@ -15,6 +16,7 @@ export default async function VendasPage() {
     { data: matsData },
     { data: compradoresData },
     { data: vendasData },
+    { data: atribuirData },
     { data: profData },
   ] = await Promise.all([
     supabase.from("materials").select("*").eq("ativo", true).eq("mostrar_venda", true).order("categoria").order("nome"),
@@ -25,12 +27,22 @@ export default async function VendasPage() {
       .gte("data_hora", inicio)
       .lt("data_hora", fim)
       .order("data_hora", { ascending: false }),
+    // vendas sem cliente definido (ex.: import de maio "Diversos")
+    supabase
+      .from("sales")
+      .select("id, total, data_hora, people!inner(nome)")
+      .eq("status", "ativa")
+      .eq("people.nome", "Diversos (Maio)")
+      .order("data_hora", { ascending: true })
+      .limit(100),
     supabase.from("profiles").select("papel").single(),
   ]);
 
   const materiais = (matsData as Material[]) ?? [];
   const compradores = (compradoresData as Pick<Pessoa,"id"|"nome">[]) ?? [];
   const vendas = (vendasData as SaleWithPessoa[]) ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const aAtribuir = (atribuirData as any[]) ?? [];
   const isAdmin = profData?.papel === "admin";
 
   const totalDia = vendas
@@ -74,6 +86,9 @@ export default async function VendasPage() {
                 </div>
               </div>
               <span className="font-extrabold text-marca-teal-dark">{formatBRL(v.total)}</span>
+              {v.status === "ativa" && (
+                <EditorClienteVenda saleId={v.id} compradores={compradores} />
+              )}
               {v.status === "ativa" && isAdmin ? (
                 <BotaoConfirmar
                   acao={cancelarVenda}
@@ -89,6 +104,30 @@ export default async function VendasPage() {
       ) : (
         <div className="rounded-2xl border bg-white p-5 text-center text-slate-400">
           Nenhuma venda registrada hoje.
+        </div>
+      )}
+
+      {/* ── vendas a atribuir (sem cliente) ── */}
+      {aAtribuir.length > 0 && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50">
+          <div className="flex items-center justify-between border-b border-amber-200 p-3">
+            <span className="font-bold text-amber-800">⚠️ Vendas a atribuir (sem cliente)</span>
+            <span className="text-sm font-semibold text-amber-700">{aAtribuir.length}</span>
+          </div>
+          {aAtribuir.map((v) => (
+            <div key={v.id} className="flex flex-wrap items-center gap-3 border-b border-amber-200 p-3 last:border-0">
+              <div className="min-w-[7rem]">
+                <div className="text-sm font-bold">
+                  {new Date(v.data_hora).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                </div>
+                <div className="text-xs text-slate-500">Diversos (Maio)</div>
+              </div>
+              <span className="font-extrabold text-marca-teal-dark">{formatBRL(Number(v.total))}</span>
+              <div className="ml-auto">
+                <EditorClienteVenda saleId={v.id} compradores={compradores} />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
