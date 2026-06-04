@@ -1,9 +1,15 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { abrirCaixa, lancarMovimento, fecharCaixa } from "./actions";
 
 const inp = "rounded-xl border p-2 text-base";
 const btnTeal = "rounded-full bg-marca-teal px-4 py-2 text-sm font-bold text-white hover:bg-marca-teal-dark";
+
+const CATEGORIAS_DESPESA = [
+  "Combustível", "Segurança", "Alimentação / Café",
+  "Manutenção / Pedágio", "Salário / Diária", "Aluguel",
+];
 
 export function BotaoAbrir({ dia }: { dia: string }) {
   return (
@@ -27,22 +33,34 @@ export function FormSaque({ dia }: { dia: string }) {
 }
 
 export function FormDespesa({ dia }: { dia: string }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [cat, setCat] = useState("");
+  const [outro, setOutro] = useState("");
+  const categoriaFinal = cat === "__outros__" ? outro.trim() : cat;
+
+  async function enviar(fd: FormData) {
+    await lancarMovimento(fd);
+    setCat(""); setOutro("");
+    formRef.current?.reset();
+  }
+
   return (
-    <form action={lancarMovimento} className="flex flex-wrap items-end gap-2">
+    <form ref={formRef} action={enviar} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="dia" value={dia} />
       <input type="hidden" name="tipo" value="despesa" />
-      <input name="categoria" list="categorias-despesa" placeholder="Categoria" className={inp} required />
-      <datalist id="categorias-despesa">
-        <option value="Combustível" />
-        <option value="Segurança" />
-        <option value="Alimentação / Café" />
-        <option value="Manutenção / Pedágio" />
-        <option value="Salário / Diária" />
-        <option value="Aluguel" />
-        <option value="Outros" />
-      </datalist>
+      <input type="hidden" name="categoria" value={categoriaFinal} />
+      <select value={cat} onChange={(e) => setCat(e.target.value)} required
+        className={inp + (cat ? "" : " text-slate-400")}>
+        <option value="" disabled>Categoria…</option>
+        {CATEGORIAS_DESPESA.map((c) => <option key={c} value={c}>{c}</option>)}
+        <option value="__outros__">Outros (digitar)…</option>
+      </select>
+      {cat === "__outros__" && (
+        <input value={outro} onChange={(e) => setOutro(e.target.value)} autoFocus required
+          placeholder="Qual categoria?" className={inp} />
+      )}
       <input name="descricao" placeholder="Descrição (ex: caminhão branco)" className={inp} />
-      <input name="valor" inputMode="decimal" placeholder="Valor" className={inp + " w-28"} />
+      <input name="valor" inputMode="decimal" placeholder="Valor" className={inp + " w-28"} required />
       <button className={btnTeal}>+ Despesa (saída)</button>
     </form>
   );
