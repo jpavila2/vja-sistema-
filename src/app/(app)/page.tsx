@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { hojeBR, limitesDoDiaBR, limitesMesBR, nomeMesAtual } from "@/lib/datas";
+import { hojeBR, limitesDoDiaBR, limitesMes, limitesMesData, mesAtual, nomeMes } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
 import { CardResumo } from "@/components/CardResumo";
 import { GraficoEntrouSaiu } from "@/components/GraficoEntrouSaiu";
@@ -8,14 +8,13 @@ import { GraficoDespesas } from "@/components/GraficoDespesas";
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-export default async function PainelPage() {
+export default async function PainelPage({ searchParams }: { searchParams: { mes?: string } }) {
   const hoje = hojeBR();
+  const mes = /^\d{4}-\d{2}$/.test(searchParams.mes ?? "") ? searchParams.mes! : mesAtual();
+  const ehMesAtual = mes === mesAtual();
   const { inicio: inicioDia, fim: fimDia } = limitesDoDiaBR(hoje);
-  const { inicio: inicioMes, fim: fimMes }  = limitesMesBR();
-  // bounds do mês para a coluna `dia` (date) de cash_movements
-  const [anoM, mesM] = hoje.split("-").map(Number);
-  const diaIniMes = `${anoM}-${String(mesM).padStart(2, "0")}-01`;
-  const diaFimMes = mesM === 12 ? `${anoM + 1}-01-01` : `${anoM}-${String(mesM + 1).padStart(2, "0")}-01`;
+  const { inicio: inicioMes, fim: fimMes }  = limitesMes(mes);
+  const { ini: diaIniMes, fim: diaFimMes }  = limitesMesData(mes);
   const supabase = await createClient();
 
   const [
@@ -136,21 +135,33 @@ export default async function PainelPage() {
         </Link>
       </div>
 
-      {/* ── hoje ── */}
-      <section>
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-slate-500">Hoje</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <CardResumo titulo="Comprado hoje" valor={formatBRL(totalCompradoHoje)} cor="teal" />
-          <CardResumo titulo="Compras hoje" valor={cH.length} cor="navy" />
-          <CardResumo titulo="Ticket médio" valor={formatBRL(cH.length ? r2(totalCompradoHoje / cH.length) : 0)} cor="gold" />
-        </div>
-      </section>
+      {/* ── hoje (só no mês corrente) ── */}
+      {ehMesAtual && (
+        <section>
+          <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-slate-500">Hoje</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <CardResumo titulo="Comprado hoje" valor={formatBRL(totalCompradoHoje)} cor="teal" />
+            <CardResumo titulo="Compras hoje" valor={cH.length} cor="navy" />
+            <CardResumo titulo="Ticket médio" valor={formatBRL(cH.length ? r2(totalCompradoHoje / cH.length) : 0)} cor="gold" />
+          </div>
+        </section>
+      )}
 
-      {/* ── mês ── */}
+      {/* ── mês (com seletor) ── */}
       <section>
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
-          {nomeMesAtual()} (mês corrente)
-        </h2>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+            {nomeMes(mes)}{ehMesAtual ? " (mês corrente)" : ""}
+          </h2>
+          <form className="flex items-center gap-2">
+            <input type="month" name="mes" defaultValue={mes}
+              className="rounded-lg border p-1.5 text-sm" />
+            <button type="submit"
+              className="rounded-lg bg-marca-teal px-3 py-1.5 text-sm font-bold text-white">Ver</button>
+            <Link href="/" className="rounded-lg border px-3 py-1.5 text-sm font-semibold text-slate-600">Mês atual</Link>
+            <Link href="/escritorio/relatorio" className="rounded-lg border px-3 py-1.5 text-sm font-semibold text-marca-teal-dark">📊 Ano</Link>
+          </form>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <CardResumo titulo="Vendido" valor={formatBRL(totalVendidoMes)} cor="green" />
           <CardResumo titulo="Comprado" valor={formatBRL(totalCompradoMes)} cor="gold" />

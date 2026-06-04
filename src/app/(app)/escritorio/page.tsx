@@ -1,28 +1,8 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
+// O Escritório abre direto no Caixa do dia; a navegação entre as seções
+// (vendas, materiais, conferência, pessoas, relatório) fica na barra de ícones
+// do layout do escritório.
 export default function EscritorioPage() {
-  const cards = [
-    { href: "/escritorio/vendas",     titulo: "Vendas",       desc: "Registrar saída de material" },
-    { href: "/escritorio/conferencia",titulo: "Conferência",  desc: "Conferir compras do dia" },
-    { href: "/escritorio/caixa",      titulo: "Caixa do dia", desc: "Resumo financeiro" },
-    { href: "/escritorio/materiais",  titulo: "Materiais",    desc: "Catálogo e preços" },
-    { href: "/escritorio/pessoas",    titulo: "Pessoas",      desc: "Catadores e clientes" },
-  ];
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Escritório</h1>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {cards.map((c) => (
-          <Link
-            key={c.href}
-            href={c.href}
-            className="rounded-2xl border bg-white p-5 shadow-sm hover:border-marca-teal"
-          >
-            <div className="text-lg font-bold">{c.titulo}</div>
-            <div className="text-sm text-slate-500">{c.desc}</div>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
+  redirect("/escritorio/caixa");
 }
