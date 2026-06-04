@@ -8,6 +8,7 @@ const ITENS = [
   { href: "/escritorio/vendas",      icone: "📦", label: "Vendas" },
   { href: "/escritorio/conferencia", icone: "✅", label: "Conferência" },
   { href: "/escritorio/materiais",   icone: "🏷️", label: "Materiais" },
+  { href: "/escritorio/areceber",    icone: "💳", label: "A receber" },
   { href: "/escritorio/pessoas",     icone: "👥", label: "Pessoas" },
   { href: "/escritorio/historico",   icone: "🧾", label: "Histórico" },
   { href: "/escritorio/relatorio",   icone: "📊", label: "Relatório" },

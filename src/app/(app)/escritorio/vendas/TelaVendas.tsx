@@ -23,6 +23,7 @@ const FORMAS: { value: FormaPagamentoVenda; label: string; emoji: string }[] = [
 export function TelaVendas({ materiais, compradores }: Props) {
   const [carrinho, setCarrinho] = useState<ItemCarrinhoVenda[]>([]);
   const [formaPgto, setFormaPgto] = useState<FormaPagamentoVenda>("pix");
+  const [aPrazo, setAPrazo] = useState(false);
   const [obsVenda, setObsVenda] = useState("");
 
   // comprador
@@ -85,11 +86,12 @@ export function TelaVendas({ materiais, compradores }: Props) {
             material_id: i.material_id, peso: i.peso, preco_unitario: i.preco_unitario,
           })),
           client_request_id: reqId,
+          recebido: !aPrazo,
         });
         if (res.ok) {
-          setMsg(`✅ Venda salva — ${formatBRL(total)}`);
+          setMsg(`✅ Venda salva — ${formatBRL(total)}${aPrazo ? " (a receber)" : ""}`);
           setCarrinho([]); setBuscaComp(""); setCompradorSel(null);
-          setObsVenda(""); setFormaPgto("pix");
+          setObsVenda(""); setFormaPgto("pix"); setAPrazo(false);
           setReqId(crypto.randomUUID());
         } else {
           setMsg("Erro: " + res.erro);
@@ -155,6 +157,10 @@ export function TelaVendas({ materiais, compradores }: Props) {
           ) : (
             <p className="mt-1 text-xs text-slate-500">Não entra no caixa físico — só registrado.</p>
           )}
+          <label className="mt-3 flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-2 text-sm font-semibold text-amber-800">
+            <input type="checkbox" checked={aPrazo} onChange={(e) => setAPrazo(e.target.checked)} className="h-5 w-5" />
+            ⏳ Venda a prazo (ainda não recebido) — vai para Contas a receber
+          </label>
         </div>
 
         <div>
