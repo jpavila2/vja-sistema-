@@ -35,9 +35,15 @@ export function TelaVendas({ materiais, compradores }: Props) {
   const [pesoStr, setPesoStr] = useState("");
   const [precoStr, setPrecoStr] = useState("");
 
+  const [buscaMat, setBuscaMat] = useState("");
   const [msg, setMsg] = useState("");
   const [reqId, setReqId] = useState(() => crypto.randomUUID());
   const [pending, startTransition] = useTransition();
+
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  const materiaisFiltrados = buscaMat.trim()
+    ? materiais.filter((m) => norm(m.nome).includes(norm(buscaMat)))
+    : materiais;
 
   const sugComp = buscarCatadores(compradores, buscaComp);
   const total = useMemo(() => calcTotalVenda(carrinho), [carrinho]);
@@ -160,9 +166,33 @@ export function TelaVendas({ materiais, compradores }: Props) {
 
       {/* ── grade de materiais ── */}
       <div>
-        <div className="mb-2 font-bold text-marca-navy">Selecione o material</div>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="font-bold text-marca-navy">Selecione o material</span>
+          <span className="text-xs text-slate-400">{materiaisFiltrados.length} de {materiais.length}</span>
+        </div>
+        <div className="relative mb-3">
+          <input
+            value={buscaMat}
+            onChange={(e) => setBuscaMat(e.target.value)}
+            aria-label="Buscar material"
+            placeholder="🔎 Buscar material por nome…"
+            className="w-full rounded-xl border p-3 text-base"
+          />
+          {buscaMat && (
+            <button type="button" onClick={() => setBuscaMat("")}
+              aria-label="Limpar busca"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm text-slate-400 hover:bg-slate-100">
+              ✕
+            </button>
+          )}
+        </div>
+        {materiaisFiltrados.length === 0 ? (
+          <div className="rounded-2xl border bg-white p-6 text-center text-slate-400">
+            Nenhum material com “{buscaMat}”.
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {materiais.map((m) => (
+          {materiaisFiltrados.map((m) => (
             <button key={m.id} onClick={() => abrirItem(m)}
               className={`${btn} flex min-h-[100px] flex-col items-center justify-center gap-1 rounded-2xl border-2 bg-white p-3 shadow-sm hover:border-marca-teal`}>
               <span className="text-3xl">{m.emoji}</span>
@@ -173,6 +203,7 @@ export function TelaVendas({ materiais, compradores }: Props) {
             </button>
           ))}
         </div>
+        )}
       </div>
 
       {/* ── carrinho ── */}
