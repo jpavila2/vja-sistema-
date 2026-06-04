@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { hojeBR, limitesDoDiaBR } from "@/lib/datas";
 import { calcularSaldoCaixa } from "@/lib/caixa-fisico";
 import { formatBRL } from "@/lib/format";
-import { CardResumo } from "@/components/CardResumo";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { BotaoAbrir, FormSaque, FormDespesa, FormFechar } from "./FormsCaixa";
 import { removerMovimento } from "./actions";
@@ -67,11 +66,11 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <CardResumo titulo="Saldo inicial" valor={formatBRL(sessao.saldo_inicial)} cor="navy" />
-            <CardResumo titulo="Entradas (saques + vendas din.)" valor={formatBRL(r.totalSaques + r.totalVendas)} cor="green" />
-            <CardResumo titulo="Saídas (compras + despesas)" valor={formatBRL(r.totalCompras + r.totalDespesas)} cor="gold" />
-            <CardResumo titulo="Saldo calculado" valor={formatBRL(r.saldoCalculado)} cor="teal" />
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-slate-200 sm:grid-cols-4">
+            <Mini titulo="Saldo inicial" valor={formatBRL(sessao.saldo_inicial)} />
+            <Mini titulo="Entradas" valor={formatBRL(r.totalSaques + r.totalVendas)} cor="text-marca-green-dark" />
+            <Mini titulo="Saídas" valor={formatBRL(r.totalCompras + r.totalDespesas)} cor="text-marca-gold" />
+            <Mini titulo="Saldo calculado" valor={formatBRL(r.saldoCalculado)} cor="text-marca-teal-dark" />
           </div>
 
           {sessao.status === "fechado" ? (
@@ -162,6 +161,15 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
           ) : null}
         </>
       )}
+    </div>
+  );
+}
+
+function Mini({ titulo, valor, cor = "text-marca-navy" }: { titulo: string; valor: string; cor?: string }) {
+  return (
+    <div className="bg-white px-3 py-2 text-center">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{titulo}</div>
+      <div className={"text-base font-extrabold sm:text-lg " + cor}>{valor}</div>
     </div>
   );
 }
