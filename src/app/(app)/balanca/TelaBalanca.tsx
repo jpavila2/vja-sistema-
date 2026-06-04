@@ -30,8 +30,14 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const [novoNome, setNovoNome] = useState("");
   const [novoTel, setNovoTel] = useState("");
   const [msg, setMsg] = useState("");
+  const [buscaMat, setBuscaMat] = useState("");
   const [reqId, setReqId] = useState<string>(() => crypto.randomUUID());
   const [pending, startTransition] = useTransition();
+
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  const materiaisFiltrados = buscaMat.trim()
+    ? materiais.filter((m) => norm(m.nome).includes(norm(buscaMat)))
+    : materiais;
 
   // catador resolvido para exibir "Pagando para" e travar lançamento no errado
   const sugestoes = buscarCatadores(fornecedores, busca);
@@ -185,9 +191,33 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
 
       {/* grade */}
       <div>
-        <div className="mb-2 text-lg font-extrabold">1) Toque no material</div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-lg font-extrabold">1) Toque no material</span>
+          <span className="text-xs text-slate-400">{materiaisFiltrados.length} de {materiais.length}</span>
+        </div>
+        <div className="relative mb-3">
+          <input
+            value={buscaMat}
+            onChange={(e) => setBuscaMat(e.target.value)}
+            aria-label="Buscar material"
+            placeholder="🔎 Buscar material por nome…"
+            className="w-full rounded-xl border p-3 text-base"
+          />
+          {buscaMat && (
+            <button type="button" onClick={() => setBuscaMat("")}
+              aria-label="Limpar busca"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm text-slate-400 hover:bg-slate-100">
+              ✕
+            </button>
+          )}
+        </div>
+        {materiaisFiltrados.length === 0 ? (
+          <div className="rounded-2xl border bg-white p-6 text-center text-slate-400">
+            Nenhum material com “{buscaMat}”.
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {materiais.map((m) => (
+          {materiaisFiltrados.map((m) => (
             <button key={m.id} onClick={() => abrir(m)}
               className={`${btn} flex min-h-[110px] flex-col items-center justify-center gap-1 border-2 bg-white p-3 shadow-sm`}>
               <span className="text-3xl">{m.emoji}</span>
@@ -196,6 +226,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
             </button>
           ))}
         </div>
+        )}
       </div>
 
       {/* cesta */}
