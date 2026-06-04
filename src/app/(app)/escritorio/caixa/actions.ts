@@ -20,20 +20,29 @@ export async function abrirCaixa(formData: FormData) {
   revalidatePath("/escritorio/caixa");
 }
 
-export async function lancarMovimento(formData: FormData) {
-  const dia = String(formData.get("dia"));
-  const tipo = String(formData.get("tipo")); // saque | despesa
-  const categoria = String(formData.get("categoria") ?? "");
-  const descricao = String(formData.get("descricao") ?? "");
-  const valor = Number(String(formData.get("valor")).replace(",", "."));
-  if (tipo !== "saque" && tipo !== "despesa") throw new Error("Tipo de lançamento inválido.");
-  if (!(valor > 0)) throw new Error("Informe um valor maior que zero.");
-  const { supabase, user } = await exigirPapel(["admin", "escritorio"]);
-  const { error } = await supabase.from("cash_movements").insert({
-    dia, tipo, categoria: categoria || null, descricao: descricao || null, valor, created_by: user.id,
-  });
-  if (error) throw new Error("Não foi possível lançar: " + error.message);
-  revalidatePath("/escritorio/caixa");
+export type ResultadoAcao = { ok: true } | { ok: false; erro: string };
+
+export async function lancarMovimento(formData: FormData): Promise<ResultadoAcao> {
+  try {
+    const dia = String(formData.get("dia"));
+    const tipo = String(formData.get("tipo")); // saque | despesa
+    const categoria = String(formData.get("categoria") ?? "");
+    const descricao = String(formData.get("descricao") ?? "");
+    const valor = Number(String(formData.get("valor")).replace(",", "."));
+    if (tipo !== "saque" && tipo !== "despesa") return { ok: false, erro: "Tipo inválido." };
+    if (tipo === "despesa" && !categoria.trim()) return { ok: false, erro: "Escolha a categoria." };
+    if (!(valor > 0)) return { ok: false, erro: "Informe um valor maior que zero." };
+    const { supabase, user } = await exigirPapel(["admin", "escritorio"]);
+    const { error } = await supabase.from("cash_movements").insert({
+      dia, tipo, categoria: categoria || null, descricao: descricao || null, valor, created_by: user.id,
+    });
+    if (error) return { ok: false, erro: "Não foi possível lançar." };
+    revalidatePath("/escritorio/caixa");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Erro ao lançar." };
+  }
 }
 
 export async function removerMovimento(formData: FormData) {
@@ -44,10 +53,11 @@ export async function removerMovimento(formData: FormData) {
   revalidatePath("/escritorio/caixa");
 }
 
-export async function fecharCaixa(formData: FormData) {
+export async function fecharCaixa(formData: FormData): Promise<ResultadoAcao> {
+  try {
   const dia = String(formData.get("dia"));
   const contado = Number(String(formData.get("contado")).replace(",", "."));
-  if (!(contado >= 0)) throw new Error("Informe o valor contado.");
+  if (!(contado >= 0)) return { ok: false, erro: "Informe o valor contado." };
 
   const { supabase, user } = await exigirPapel(["admin", "escritorio"]);
   const { inicio, fim } = limitesDoDiaBR(dia);
@@ -86,8 +96,12 @@ export async function fecharCaixa(formData: FormData) {
       fechado_em: new Date().toISOString(),
     })
     .eq("dia", dia).eq("status", "aberto").select("id");
-  if (error) throw new Error("Não foi possível fechar o caixa: " + error.message);
-  if (!data || data.length === 0) throw new Error("Caixa não está aberto para fechar.");
+  if (error) return { ok: false, erro: "Não foi possível fechar o caixa." };
+  if (!data || data.length === 0) return { ok: false, erro: "Caixa não está aberto para fechar." };
   revalidatePath("/escritorio/caixa");
   revalidatePath("/");
+  return { ok: true };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Erro ao fechar o caixa." };
+  }
 }

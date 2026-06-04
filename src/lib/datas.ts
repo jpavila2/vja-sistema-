@@ -62,6 +62,22 @@ export function nomeMes(mes: string): string {
     .format(new Date(ano, m - 1, 1));
 }
 
+/** Dia "YYYY-MM-DD" deslocado em `dias` (ex.: -1 = ontem, +1 = amanhã). */
+export function diaAdjacente(dia: string, dias: number): string {
+  const d = new Date(`${dia}T12:00:00-03:00`);
+  d.setDate(d.getDate() + dias);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(d);
+}
+
+/** Data "YYYY-MM-DD" por extenso, ex.: "ter, 3 de junho". */
+export function dataExtenso(dia: string): string {
+  return new Date(`${dia}T12:00:00`).toLocaleDateString("pt-BR", {
+    weekday: "short", day: "numeric", month: "long",
+  });
+}
+
 /** Ano corrente (fuso BR). */
 export function anoAtual(): number {
   return Number(hojeBR().slice(0, 4));

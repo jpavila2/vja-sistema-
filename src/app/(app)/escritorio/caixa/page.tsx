@@ -3,11 +3,12 @@ import { hojeBR, limitesDoDiaBR } from "@/lib/datas";
 import { calcularSaldoCaixa } from "@/lib/caixa-fisico";
 import { formatBRL } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
+import { NavData } from "@/components/NavData";
 import { BotaoAbrir, FormSaque, FormDespesa, FormFechar } from "./FormsCaixa";
 import { removerMovimento } from "./actions";
 
 export default async function CaixaPage({ searchParams }: { searchParams: { dia?: string } }) {
-  const dia = searchParams.dia ?? hojeBR();
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.dia ?? "") ? searchParams.dia! : hojeBR();
   const { inicio, fim } = limitesDoDiaBR(dia);
   const supabase = await createClient();
 
@@ -56,7 +57,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-marca-navy">Caixa do dia</h1>
-        <form><input type="date" name="dia" defaultValue={dia} className="rounded-xl border p-2" /></form>
+        <NavData dia={dia} base="/escritorio/caixa" />
       </div>
 
       {!sessao ? (

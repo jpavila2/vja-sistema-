@@ -1,15 +1,27 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { abrirCaixa, lancarMovimento, fecharCaixa } from "./actions";
+import { CampoDinheiro } from "@/components/CampoDinheiro";
 
 const inp = "rounded-xl border p-2 text-base";
-const btnTeal = "rounded-full bg-marca-teal px-4 py-2 text-sm font-bold text-white hover:bg-marca-teal-dark";
+const btnTeal = "rounded-full bg-marca-teal px-4 py-2 text-sm font-bold text-white hover:bg-marca-teal-dark disabled:opacity-50";
 
 const CATEGORIAS_DESPESA = [
   "Combustível", "Segurança", "Alimentação / Café",
   "Manutenção / Pedágio", "Salário / Diária", "Aluguel",
 ];
+
+type Msg = { ok: boolean; txt: string } | null;
+
+function Aviso({ msg }: { msg: Msg }) {
+  if (!msg) return null;
+  return (
+    <span className={"text-sm font-bold " + (msg.ok ? "text-marca-green-dark" : "text-red-600")}>
+      {msg.txt}
+    </span>
+  );
+}
 
 export function BotaoAbrir({ dia }: { dia: string }) {
   return (
@@ -21,13 +33,27 @@ export function BotaoAbrir({ dia }: { dia: string }) {
 }
 
 export function FormSaque({ dia }: { dia: string }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [msg, setMsg] = useState<Msg>(null);
+  const [rk, setRk] = useState(0);
+  const [pending, start] = useTransition();
+
+  function enviar(fd: FormData) {
+    start(async () => {
+      const res = await lancarMovimento(fd);
+      if (res.ok) { setMsg({ ok: true, txt: "✅ Saque lançado" }); formRef.current?.reset(); setRk((k) => k + 1); }
+      else setMsg({ ok: false, txt: res.erro });
+    });
+  }
+
   return (
-    <form action={lancarMovimento} className="flex flex-wrap items-end gap-2">
+    <form ref={formRef} action={enviar} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="dia" value={dia} />
       <input type="hidden" name="tipo" value="saque" />
       <input name="descricao" placeholder="Descrição (ex: saque banco)" className={inp} />
-      <input name="valor" inputMode="decimal" placeholder="Valor" className={inp + " w-28"} />
-      <button className={btnTeal}>+ Saque (entrada)</button>
+      <CampoDinheiro key={rk} name="valor" placeholder="R$ 0,00" className={inp + " w-32"} />
+      <button disabled={pending} className={btnTeal}>{pending ? "Salvando…" : "+ Saque (entrada)"}</button>
+      <Aviso msg={msg} />
     </form>
   );
 }
@@ -36,12 +62,19 @@ export function FormDespesa({ dia }: { dia: string }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [cat, setCat] = useState("");
   const [outro, setOutro] = useState("");
+  const [msg, setMsg] = useState<Msg>(null);
+  const [rk, setRk] = useState(0);
+  const [pending, start] = useTransition();
   const categoriaFinal = cat === "__outros__" ? outro.trim() : cat;
 
-  async function enviar(fd: FormData) {
-    await lancarMovimento(fd);
-    setCat(""); setOutro("");
-    formRef.current?.reset();
+  function enviar(fd: FormData) {
+    start(async () => {
+      const res = await lancarMovimento(fd);
+      if (res.ok) {
+        setMsg({ ok: true, txt: "✅ Despesa lançada" });
+        formRef.current?.reset(); setCat(""); setOutro(""); setRk((k) => k + 1);
+      } else setMsg({ ok: false, txt: res.erro });
+    });
   }
 
   return (
@@ -60,19 +93,34 @@ export function FormDespesa({ dia }: { dia: string }) {
           placeholder="Qual categoria?" className={inp} />
       )}
       <input name="descricao" placeholder="Descrição (ex: caminhão branco)" className={inp} />
-      <input name="valor" inputMode="decimal" placeholder="Valor" className={inp + " w-28"} required />
-      <button className={btnTeal}>+ Despesa (saída)</button>
+      <CampoDinheiro key={rk} name="valor" placeholder="R$ 0,00" className={inp + " w-32"} />
+      <button disabled={pending} className={btnTeal}>{pending ? "Salvando…" : "+ Despesa (saída)"}</button>
+      <Aviso msg={msg} />
     </form>
   );
 }
 
 export function FormFechar({ dia }: { dia: string }) {
+  const [msg, setMsg] = useState<Msg>(null);
+  const [pending, start] = useTransition();
+
+  function enviar(fd: FormData) {
+    if (!confirm("Fechar o caixa do dia? O saldo contado vira a abertura de amanhã.")) return;
+    start(async () => {
+      const res = await fecharCaixa(fd);
+      if (!res.ok) setMsg({ ok: false, txt: res.erro });
+      // sucesso: a página recarrega mostrando "Caixa fechado"
+    });
+  }
+
   return (
-    <form action={fecharCaixa} className="flex flex-wrap items-end gap-2"
-      onSubmit={(e) => { if (!confirm("Fechar o caixa do dia? O saldo contado vira a abertura de amanhã.")) e.preventDefault(); }}>
+    <form action={enviar} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="dia" value={dia} />
-      <input name="contado" inputMode="decimal" placeholder="Dinheiro contado na gaveta" className={inp + " w-56"} required />
-      <button className="rounded-full bg-marca-navy px-4 py-2 text-sm font-bold text-white">Fechar e conferir</button>
+      <CampoDinheiro name="contado" placeholder="Dinheiro contado na gaveta" className={inp + " w-56"} />
+      <button disabled={pending} className="rounded-full bg-marca-navy px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+        {pending ? "Fechando…" : "Fechar e conferir"}
+      </button>
+      <Aviso msg={msg} />
     </form>
   );
 }
