@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
-import { calcTotalCompra } from "@/lib/compra";
+import { calcTotalCompra, pesoLiquido } from "@/lib/compra";
 import { registrarCompra } from "./actions";
 import { buscarCatadores, resolverCatador, type CatadorOpt } from "@/lib/catador";
 import type { Material, ItemCesta, Pessoa } from "@/lib/types";
@@ -21,6 +21,9 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const [sel, setSel] = useState<Material | null>(null);
   const [pesoStr, setPesoStr] = useState("0");
   const [precoStr, setPrecoStr] = useState(""); // preço de compra editável (preço especial)
+  const [bags, setBags] = useState(0); // nº de big bags (cada bag desconta kgBag do bruto)
+  const [kgBagStr, setKgBagStr] = useState("3"); // kg descontado por bag (padrão 3)
+  const [bagsCustom, setBagsCustom] = useState(false); // campo "+mais" aberto
   const [pct, setPct] = useState(0); // % de impureza
   const [pctStr, setPctStr] = useState(""); // campo custom
   const [modo, setModo] = useState<ModoCatador>("conhecido");
@@ -46,17 +49,25 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
     catadorSel ?? (resol.tipo === "ok" ? { id: resol.id, nome: resol.nome } : null);
 
   const peso = parseFloat(pesoStr.replace(",", ".")) || 0;
-  const liquido = r3(peso * (1 - pct / 100));
+  const kgBag = parseFloat(kgBagStr.replace(",", ".")) || 0;
+  const descontoBag = r3(Math.max(0, bags) * Math.max(0, kgBag));
+  const liquido = sel ? pesoLiquido(peso, bags, kgBag, pct) : 0;
   const precoEdit = parseFloat(precoStr.replace(",", ".")) || 0;
   const valorAtual = sel ? calcSubtotal(liquido, precoEdit) : 0;
   const total = useMemo(() => calcTotalCompra(cesta), [cesta]);
 
   function abrir(m: Material) {
     setSel(m); setPesoStr("0"); setPct(0); setPctStr("");
+    setBags(0); setKgBagStr("3"); setBagsCustom(false);
     setPrecoStr(m.preco_compra > 0 ? String(m.preco_compra) : "");
   }
   function tecla(k: string) {
     setPesoStr((c) => (k === "back" ? (c.length > 1 ? c.slice(0, -1) : "0") : k === "," ? (c.includes(",") ? c : c + ",") : c === "0" ? k : c + k));
+  }
+  function escolherBags(n: number) { setBags((b) => (b === n ? 0 : n)); setBagsCustom(false); }
+  function bagsCustomChange(v: string) {
+    const n = parseInt(v.replace(/\D/g, ""), 10);
+    setBags(Number.isFinite(n) && n > 0 ? n : 0);
   }
   function escolherPct(p: number) { setPct(p); setPctStr(""); }
   function pctCustom(v: string) {
@@ -122,7 +133,8 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
 
   const btn = "rounded-xl text-xl font-extrabold active:scale-95 transition-transform";
   const tab = (on: boolean) => "rounded-full px-4 py-2 text-sm font-bold " + (on ? "bg-marca-teal text-white" : "bg-slate-100 text-slate-600");
-  const pctBtn = (on: boolean) => "rounded-xl px-4 py-3 text-lg font-extrabold " + (on ? "bg-marca-teal text-white" : "bg-slate-100 text-slate-700");
+  const bagBtn = (on: boolean) => "rounded-xl px-5 py-3 text-xl font-black active:scale-95 " + (on ? "bg-marca-teal text-white" : "bg-slate-100 text-slate-700");
+  const pctBtn = (on: boolean) => "rounded-lg px-3 py-1.5 text-sm font-bold " + (on ? "bg-marca-teal text-white" : "bg-slate-100 text-slate-600");
 
   return (
     <div className="space-y-4">
@@ -296,14 +308,54 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
                 </button>
               ) : null}
             </div>
-            {/* impureza % */}
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-sm font-bold text-slate-600">Impureza:</span>
+            {/* desconto por bag (big bag) — em destaque */}
+            <div className="mb-3 rounded-xl border-2 border-marca-teal-light bg-marca-teal-light/30 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-base font-extrabold text-marca-teal-dark">🛍️ Bags</span>
+                {descontoBag > 0 ? (
+                  <span className="text-base font-black text-marca-teal-dark">− {descontoBag.toLocaleString("pt-BR")} {sel.unidade}</span>
+                ) : (
+                  <span className="text-sm text-slate-400">sem desconto</span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {[1, 2, 3].map((n) => (
+                  <button key={n} onClick={() => escolherBags(n)} className={bagBtn(bags === n && !bagsCustom)}>{n}</button>
+                ))}
+                {bagsCustom ? (
+                  <input
+                    inputMode="numeric" autoFocus
+                    value={bags > 0 ? String(bags) : ""}
+                    onChange={(e) => bagsCustomChange(e.target.value)}
+                    aria-label="Quantidade de bags"
+                    placeholder="nº"
+                    className="w-20 rounded-xl border-2 border-marca-teal p-2 text-center text-xl font-black"
+                  />
+                ) : (
+                  <button onClick={() => { setBagsCustom(true); }} className={bagBtn(bags > 3)}>
+                    {bags > 3 ? `${bags} ▾` : "+mais"}
+                  </button>
+                )}
+                <div className="ml-auto flex items-center gap-1">
+                  <label className="text-xs font-bold text-slate-500">kg/bag</label>
+                  <input
+                    inputMode="decimal"
+                    value={kgBagStr}
+                    onChange={(e) => setKgBagStr(e.target.value)}
+                    aria-label="Kg por bag"
+                    className="w-16 rounded-lg border p-2 text-center text-base font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+            {/* impureza % — secundário, menor, embaixo */}
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-400">Impureza:</span>
               <button onClick={() => escolherPct(0)} className={pctBtn(pct === 0 && pctStr === "")}>0%</button>
               <button onClick={() => escolherPct(5)} className={pctBtn(pct === 5 && pctStr === "")}>5%</button>
               <button onClick={() => escolherPct(10)} className={pctBtn(pct === 10 && pctStr === "")}>10%</button>
               <input inputMode="decimal" value={pctStr} onChange={(e) => pctCustom(e.target.value)}
-                placeholder="outro %" className="w-24 rounded-lg border p-2 text-center text-lg" />
+                placeholder="outro %" className="w-20 rounded-lg border p-1.5 text-center text-sm" />
             </div>
             <div className="grid grid-cols-3 gap-2">
               {["7","8","9","4","5","6","1","2","3",",","0","back"].map((k) => (
