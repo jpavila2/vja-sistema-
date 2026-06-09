@@ -336,99 +336,110 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
       {/* teclado */}
       {sel ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-          <div className="w-full max-w-2xl rounded-t-3xl bg-white p-4">
-            <div className="mb-3 flex items-center gap-3">
-              <span className="text-3xl">{sel.emoji}</span>
-              <span className="text-2xl font-black">{sel.nome}</span>
-              <span className="ml-auto text-sm font-bold text-slate-400">tabela {formatBRL(sel.preco_compra)}/{sel.unidade}</span>
-            </div>
-            <div className="mb-3 grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-slate-100 p-3 text-center">
-                <div className="text-xs font-bold uppercase text-slate-500">Peso bruto ({sel.unidade})</div>
-                <div className="text-4xl font-black">{pesoStr}</div>
+          <div className="flex max-h-[100dvh] w-full max-w-2xl flex-col rounded-t-3xl bg-white">
+            {/* readout fixo: material + peso digitado + valor somando (sempre visível) */}
+            <div className="shrink-0 border-b px-4 pb-3 pt-3">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-2xl">{sel.emoji}</span>
+                <span className="text-xl font-black">{sel.nome}</span>
+                <span className="ml-auto text-xs font-bold text-slate-400">tabela {formatBRL(sel.preco_compra)}/{sel.unidade}</span>
               </div>
-              <div className="rounded-xl bg-slate-100 p-3 text-center">
-                <div className="text-xs font-bold uppercase text-slate-500">Valor (líq. {liquido.toLocaleString("pt-BR")})</div>
-                <div className="text-4xl font-black text-marca-teal-dark">{formatBRL(valorAtual)}</div>
-              </div>
-            </div>
-            {/* preço de compra editável (preço especial pro catador) */}
-            <div className="mb-3 flex items-center gap-2">
-              <label className="text-sm font-bold text-slate-600">Preço (R$/{sel.unidade}):</label>
-              <input
-                inputMode="decimal"
-                value={precoStr}
-                onChange={(e) => setPrecoStr(e.target.value)}
-                aria-label="Preço de compra"
-                placeholder={sel.preco_compra > 0 ? String(sel.preco_compra) : "0,00"}
-                className="w-28 rounded-lg border p-2 text-center text-lg font-bold"
-              />
-              {precoEdit !== sel.preco_compra ? (
-                <button type="button" onClick={() => setPrecoStr(String(sel.preco_compra))}
-                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-600">
-                  ↺ tabela
-                </button>
-              ) : null}
-            </div>
-            {/* desconto por bag (big bag) — em destaque */}
-            <div className="mb-3 rounded-xl border-2 border-marca-teal-light bg-marca-teal-light/30 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-base font-extrabold text-marca-teal-dark">🛍️ Bags</span>
-                {descontoBag > 0 ? (
-                  <span className="text-base font-black text-marca-teal-dark">− {descontoBag.toLocaleString("pt-BR")} {sel.unidade}</span>
-                ) : (
-                  <span className="text-sm text-slate-400">sem desconto</span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {[1, 2, 3].map((n) => (
-                  <button key={n} onClick={() => escolherBags(n)} className={bagBtn(bags === n && !bagsCustom)}>{n}</button>
-                ))}
-                {bagsCustom ? (
-                  <input
-                    inputMode="numeric" autoFocus
-                    value={bags > 0 ? String(bags) : ""}
-                    onChange={(e) => bagsCustomChange(e.target.value)}
-                    aria-label="Quantidade de bags"
-                    placeholder="nº"
-                    className="w-20 rounded-xl border-2 border-marca-teal p-2 text-center text-xl font-black"
-                  />
-                ) : (
-                  <button onClick={() => { setBagsCustom(true); }} className={bagBtn(bags > 3)}>
-                    {bags > 3 ? `${bags} ▾` : "+mais"}
-                  </button>
-                )}
-                <div className="ml-auto flex items-center gap-1">
-                  <label className="text-xs font-bold text-slate-500">kg/bag</label>
-                  <input
-                    inputMode="decimal"
-                    value={kgBagStr}
-                    onChange={(e) => setKgBagStr(e.target.value)}
-                    aria-label="Kg por bag"
-                    className="w-16 rounded-lg border p-2 text-center text-base font-bold"
-                  />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-slate-100 px-3 py-2 text-center">
+                  <div className="text-[11px] font-bold uppercase text-slate-500">Peso bruto ({sel.unidade})</div>
+                  <div className="text-3xl font-black leading-tight">{pesoStr}</div>
+                </div>
+                <div className="rounded-xl bg-marca-teal-light/40 px-3 py-2 text-center">
+                  <div className="text-[11px] font-bold uppercase text-slate-500">Valor (líq. {liquido.toLocaleString("pt-BR")})</div>
+                  <div className="text-3xl font-black leading-tight text-marca-teal-dark">{formatBRL(valorAtual)}</div>
                 </div>
               </div>
             </div>
-            {/* impureza % — secundário, menor, embaixo */}
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-400">Impureza:</span>
-              <button onClick={() => escolherPct(0)} className={pctBtn(pct === 0 && pctStr === "")}>0%</button>
-              <button onClick={() => escolherPct(5)} className={pctBtn(pct === 5 && pctStr === "")}>5%</button>
-              <button onClick={() => escolherPct(10)} className={pctBtn(pct === 10 && pctStr === "")}>10%</button>
-              <input inputMode="decimal" value={pctStr} onChange={(e) => pctCustom(e.target.value)}
-                placeholder="outro %" className="w-20 rounded-lg border p-1.5 text-center text-sm" />
+
+            {/* controles roláveis: preço + bags + impureza (encolhem em telas baixas) */}
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-2">
+              {/* preço de compra editável (preço especial pro catador) */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-bold text-slate-600">Preço (R$/{sel.unidade}):</label>
+                <input
+                  inputMode="decimal"
+                  value={precoStr}
+                  onChange={(e) => setPrecoStr(e.target.value)}
+                  aria-label="Preço de compra"
+                  placeholder={sel.preco_compra > 0 ? String(sel.preco_compra) : "0,00"}
+                  className="w-28 rounded-lg border p-2 text-center text-lg font-bold"
+                />
+                {precoEdit !== sel.preco_compra ? (
+                  <button type="button" onClick={() => setPrecoStr(String(sel.preco_compra))}
+                    className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-600">
+                    ↺ tabela
+                  </button>
+                ) : null}
+              </div>
+              {/* desconto por bag (big bag) — em destaque */}
+              <div className="rounded-xl border-2 border-marca-teal-light bg-marca-teal-light/30 p-2.5">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-base font-extrabold text-marca-teal-dark">🛍️ Bags</span>
+                  {descontoBag > 0 ? (
+                    <span className="text-base font-black text-marca-teal-dark">− {descontoBag.toLocaleString("pt-BR")} {sel.unidade}</span>
+                  ) : (
+                    <span className="text-sm text-slate-400">sem desconto</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[1, 2, 3].map((n) => (
+                    <button key={n} onClick={() => escolherBags(n)} className={bagBtn(bags === n && !bagsCustom)}>{n}</button>
+                  ))}
+                  {bagsCustom ? (
+                    <input
+                      inputMode="numeric" autoFocus
+                      value={bags > 0 ? String(bags) : ""}
+                      onChange={(e) => bagsCustomChange(e.target.value)}
+                      aria-label="Quantidade de bags"
+                      placeholder="nº"
+                      className="w-20 rounded-xl border-2 border-marca-teal p-2 text-center text-xl font-black"
+                    />
+                  ) : (
+                    <button onClick={() => { setBagsCustom(true); }} className={bagBtn(bags > 3)}>
+                      {bags > 3 ? `${bags} ▾` : "+mais"}
+                    </button>
+                  )}
+                  <div className="ml-auto flex items-center gap-1">
+                    <label className="text-xs font-bold text-slate-500">kg/bag</label>
+                    <input
+                      inputMode="decimal"
+                      value={kgBagStr}
+                      onChange={(e) => setKgBagStr(e.target.value)}
+                      aria-label="Kg por bag"
+                      className="w-16 rounded-lg border p-2 text-center text-base font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+              {/* impureza % — secundário, menor, embaixo */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-400">Impureza:</span>
+                <button onClick={() => escolherPct(0)} className={pctBtn(pct === 0 && pctStr === "")}>0%</button>
+                <button onClick={() => escolherPct(5)} className={pctBtn(pct === 5 && pctStr === "")}>5%</button>
+                <button onClick={() => escolherPct(10)} className={pctBtn(pct === 10 && pctStr === "")}>10%</button>
+                <input inputMode="decimal" value={pctStr} onChange={(e) => pctCustom(e.target.value)}
+                  placeholder="outro %" className="w-20 rounded-lg border p-1.5 text-center text-sm" />
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {["7","8","9","4","5","6","1","2","3",",","0","back"].map((k) => (
-                <button key={k} onClick={() => tecla(k)} className={`${btn} bg-slate-100 p-4 text-2xl ${k === "back" ? "text-red-600" : ""}`}>
-                  {k === "back" ? "⌫" : k}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <button onClick={() => setSel(null)} className={`${btn} bg-slate-200 p-4 text-lg`}>Cancelar</button>
-              <button onClick={adicionar} className={`${btn} col-span-2 bg-marca-green p-4 text-xl text-white`}>✅ Adicionar item</button>
+
+            {/* teclado + ações fixos embaixo (sempre tocáveis) */}
+            <div className="shrink-0 border-t px-4 pb-4 pt-2">
+              <div className="grid grid-cols-3 gap-2">
+                {["7","8","9","4","5","6","1","2","3",",","0","back"].map((k) => (
+                  <button key={k} onClick={() => tecla(k)} className={`${btn} bg-slate-100 p-3 text-2xl ${k === "back" ? "text-red-600" : ""}`}>
+                    {k === "back" ? "⌫" : k}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <button onClick={() => setSel(null)} className={`${btn} bg-slate-200 p-3 text-lg`}>Cancelar</button>
+                <button onClick={adicionar} className={`${btn} col-span-2 bg-marca-green p-3 text-xl text-white`}>✅ Adicionar item</button>
+              </div>
             </div>
           </div>
         </div>
