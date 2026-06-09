@@ -51,6 +51,18 @@ export async function cancelarCompra(formData: FormData) {
   const { error } = await supabase.rpc("cancelar_compra", { p_id: id, p_motivo: motivo });
   if (error) throw new Error("Não foi possível cancelar: " + error.message);
   revalidatePath("/escritorio/conferencia");
+  revalidatePath("/escritorio/historico");
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/escritorio/materiais");
+}
+
+export async function excluirCompra(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { error } = await supabase.rpc("excluir_compra", { p_id: id });
+  if (error) throw new Error("Não foi possível excluir: " + error.message);
+  revalidatePath("/escritorio/conferencia");
+  revalidatePath("/escritorio/historico");
   revalidatePath("/escritorio/caixa");
   revalidatePath("/escritorio/materiais");
 }

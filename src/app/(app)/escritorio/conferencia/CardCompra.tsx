@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
-import { conferirCompra, cancelarCompra, editarCompra } from "./actions";
+import { conferirCompra, cancelarCompra, editarCompra, excluirCompra } from "./actions";
 
 export type MaterialOpt = { id: number; nome: string; emoji: string | null; unidade: string; preco_compra: number };
 type Item = {
@@ -233,16 +233,25 @@ export function CardCompra({ compra: c, materiais }: { compra: Compra; materiais
           </button>
         ) : null}
 
-        {c.status === "pendente" ? (
+        {c.status !== "cancelada" ? (
           <BotaoConfirmar
             acao={cancelarCompra}
             hidden={{ id: c.id, motivo: "cancelada na conferência" }}
-            mensagem={`Cancelar a compra de ${c.people?.nome ?? "—"} (${formatBRL(c.total)})? O estoque será estornado.`}
+            mensagem={`Cancelar a compra de ${c.people?.nome ?? "—"} (${formatBRL(c.total)})? O estoque será estornado, mas a compra continua no histórico como cancelada.`}
             className="rounded-full border border-red-300 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50"
           >
             Cancelar
           </BotaoConfirmar>
         ) : null}
+
+        <BotaoConfirmar
+          acao={excluirCompra}
+          hidden={{ id: c.id }}
+          mensagem={`EXCLUIR DE VEZ a compra de ${c.people?.nome ?? "—"} (${formatBRL(c.total)})? Ela some do sistema e do histórico${c.status !== "cancelada" ? ", e o estoque é estornado" : ""}. Não dá pra desfazer.`}
+          className="rounded-full border border-red-500 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100"
+        >
+          🗑️ Excluir
+        </BotaoConfirmar>
       </div>
     </div>
   );

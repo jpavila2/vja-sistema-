@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { limitesMes, limitesMesData, mesAtual, nomeMes } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
@@ -44,9 +45,9 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Tabela titulo="📦 Vendas" total={totalVendas} cor="text-marca-teal-dark"
-          linhas={vendas} rotuloPessoa="Cliente" vazio="Nenhuma venda no mês." />
+          linhas={vendas} rotuloPessoa="Cliente" vazio="Nenhuma venda no mês." hrefBase="/escritorio/venda" />
         <Tabela titulo="⚖️ Compras" total={totalCompras} cor="text-marca-gold"
-          linhas={compras} rotuloPessoa="Catador" vazio="Nenhuma compra no mês." />
+          linhas={compras} rotuloPessoa="Catador" vazio="Nenhuma compra no mês." hrefBase="/escritorio/compra" />
       </div>
 
       <div className="rounded-2xl border bg-white">
@@ -59,7 +60,8 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
         ) : (
           <div className="max-h-[28rem] overflow-y-auto">
             {despesas.map((d) => (
-              <div key={d.id} className="flex items-center gap-3 border-b p-3 last:border-0">
+              <Link key={d.id} href={`/escritorio/despesa/${d.id}`}
+                className="flex items-center gap-3 border-b p-3 last:border-0 hover:bg-slate-50">
                 <div className="w-14 shrink-0 text-xs font-bold text-slate-500">
                   {new Date(`${d.dia}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
                 </div>
@@ -68,7 +70,8 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
                   {d.descricao ? <div className="truncate text-xs text-slate-400">{d.descricao}</div> : null}
                 </div>
                 <span className="font-bold text-red-600">{formatBRL(Number(d.valor))}</span>
-              </div>
+                <span className="text-slate-300">›</span>
+              </Link>
             ))}
           </div>
         )}
@@ -77,8 +80,8 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
   );
 }
 
-function Tabela({ titulo, total, cor, linhas, rotuloPessoa, vazio }: {
-  titulo: string; total: number; cor: string; linhas: Linha[]; rotuloPessoa: string; vazio: string;
+function Tabela({ titulo, total, cor, linhas, rotuloPessoa, vazio, hrefBase }: {
+  titulo: string; total: number; cor: string; linhas: Linha[]; rotuloPessoa: string; vazio: string; hrefBase: string;
 }) {
   return (
     <div className="rounded-2xl border bg-white">
@@ -91,7 +94,8 @@ function Tabela({ titulo, total, cor, linhas, rotuloPessoa, vazio }: {
       ) : (
         <div className="max-h-[28rem] overflow-y-auto">
           {linhas.map((l) => (
-            <div key={l.id} className={"flex items-center gap-3 border-b p-3 last:border-0 " + (l.status === "cancelada" ? "opacity-40" : "")}>
+            <Link key={l.id} href={`${hrefBase}/${l.id}`}
+              className={"flex items-center gap-3 border-b p-3 last:border-0 hover:bg-slate-50 " + (l.status === "cancelada" ? "opacity-40" : "")}>
               <div className="w-14 shrink-0 text-xs font-bold text-slate-500">
                 {new Date(l.data_hora).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
               </div>
@@ -102,7 +106,8 @@ function Tabela({ titulo, total, cor, linhas, rotuloPessoa, vazio }: {
                 </div>
               </div>
               <span className={"font-bold " + cor}>{formatBRL(Number(l.total))}</span>
-            </div>
+              <span className="text-slate-300">›</span>
+            </Link>
           ))}
         </div>
       )}
