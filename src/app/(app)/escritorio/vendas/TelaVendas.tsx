@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { formatBRL } from "@/lib/format";
 import { calcTotalVenda, calcSubtotalVenda } from "@/lib/venda";
+import { usePersistedState } from "@/lib/usePersistedState";
 import { buscarCatadores } from "@/lib/catador";
 import { registrarVenda } from "./actions";
 import type { Material, ItemCarrinhoVenda, Pessoa, FormaPagamentoVenda } from "@/lib/types";
@@ -21,7 +22,8 @@ const FORMAS: { value: FormaPagamentoVenda; label: string; emoji: string }[] = [
 ];
 
 export function TelaVendas({ materiais, compradores }: Props) {
-  const [carrinho, setCarrinho] = useState<ItemCarrinhoVenda[]>([]);
+  // rascunho automático: o carrinho fica salvo no aparelho e volta se fechar/atualizar
+  const [carrinho, setCarrinho] = usePersistedState<ItemCarrinhoVenda[]>("vja:vendas:carrinho:v1", []);
   const [formaPgto, setFormaPgto] = useState<FormaPagamentoVenda>("pix");
   const [aPrazo, setAPrazo] = useState(false);
   const [obsVenda, setObsVenda] = useState("");

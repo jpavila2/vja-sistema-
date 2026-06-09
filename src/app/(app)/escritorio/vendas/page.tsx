@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hojeBR, limitesDoDiaBR } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { cancelarVenda } from "./actions";
 import { TelaVendas } from "./TelaVendas";
 import { EditorClienteVenda } from "./EditorClienteVenda";
@@ -51,6 +52,7 @@ export default async function VendasPage() {
 
   return (
     <div className="space-y-4">
+      <RealtimeRefresh tables={["sales", "sale_items"]} canal="vendas" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-marca-navy">Vendas</h1>
         <span className="text-sm text-slate-500">

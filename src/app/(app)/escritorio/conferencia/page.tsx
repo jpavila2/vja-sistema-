@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { hojeBR, limitesDoDiaBR } from "@/lib/datas";
 import { NavData } from "@/components/NavData";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { ListaConferencia } from "./ListaConferencia";
 
 export default async function ConferenciaPage({ searchParams }: { searchParams: { dia?: string } }) {
@@ -17,6 +18,7 @@ export default async function ConferenciaPage({ searchParams }: { searchParams: 
   ]);
   return (
     <div className="space-y-4">
+      <RealtimeRefresh tables={["purchases", "purchase_items", "stock_movements"]} canal="conferencia" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-marca-navy">Conferência</h1>
         <NavData dia={dia} base="/escritorio/conferencia" />

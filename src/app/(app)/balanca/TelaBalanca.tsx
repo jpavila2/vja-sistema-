@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
 import { calcTotalCompra, pesoLiquido } from "@/lib/compra";
+import { usePersistedState } from "@/lib/usePersistedState";
 import { registrarCompra, criarCatador, precosDoCatador, salvarPrecosCatador } from "./actions";
 import { buscarCatadores, resolverCatador, type CatadorOpt } from "@/lib/catador";
 import type { Material, ItemCesta, Pessoa } from "@/lib/types";
@@ -17,7 +18,8 @@ type ModoCatador = "conhecido" | "novo" | "avulso";
 const r3 = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000;
 
 export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
-  const [cesta, setCesta] = useState<ItemCesta[]>([]);
+  // rascunho automático: a cesta fica salva no aparelho e volta se fechar/atualizar
+  const [cesta, setCesta] = usePersistedState<ItemCesta[]>("vja:balanca:cesta:v1", []);
   const [sel, setSel] = useState<Material | null>(null);
   const [pesoStr, setPesoStr] = useState("0");
   const [precoStr, setPrecoStr] = useState(""); // preço de compra editável (preço especial)

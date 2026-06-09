@@ -3,6 +3,7 @@ import { hojeBR, limitesDoDiaBR } from "@/lib/datas";
 import { calcularSaldoCaixa } from "@/lib/caixa-fisico";
 import { formatBRL } from "@/lib/format";
 import { NavData } from "@/components/NavData";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import {
   BotaoAbrir, FormSaque, FormDespesa, FormFechar,
   SaldoInicialEditavel, LinhaMovimento, BotaoReabrir,
@@ -56,6 +57,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
 
   return (
     <div className="space-y-4">
+      <RealtimeRefresh tables={["cash_sessions", "cash_movements", "purchases", "sales"]} canal="caixa" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-marca-navy">Caixa do dia</h1>
         <NavData dia={dia} base="/escritorio/caixa" />

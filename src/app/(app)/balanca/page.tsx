@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { TelaBalanca } from "./TelaBalanca";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import type { Material, Pessoa } from "@/lib/types";
 
 export default async function BalancaPage() {
@@ -13,6 +14,7 @@ export default async function BalancaPage() {
   const fornecedores = todas.filter((p) => p.nome !== "Avulso");
   return (
     <div className="space-y-4">
+      <RealtimeRefresh tables={["materials", "people"]} canal="balanca" />
       <h1 className="text-2xl font-bold text-marca-navy">Compra — Balança</h1>
       <TelaBalanca
         materiais={(materiais as Material[]) ?? []}
