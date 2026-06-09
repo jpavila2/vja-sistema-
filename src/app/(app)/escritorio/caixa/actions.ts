@@ -53,6 +53,57 @@ export async function removerMovimento(formData: FormData) {
   revalidatePath("/escritorio/caixa");
 }
 
+/** Corrige o saldo de abertura do dia (só com o caixa aberto). */
+export async function editarSaldoInicial(input: { dia: string; valor: number }): Promise<ResultadoAcao> {
+  if (!(input.valor >= 0)) return { ok: false, erro: "Informe um valor válido." };
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { data, error } = await supabase.from("cash_sessions")
+    .update({ saldo_inicial: input.valor })
+    .eq("dia", input.dia).eq("status", "aberto").select("id");
+  if (error) return { ok: false, erro: "Não foi possível salvar." };
+  if (!data || data.length === 0) return { ok: false, erro: "Caixa não está aberto." };
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Edita um saque/despesa existente (só com o caixa aberto). */
+export async function editarMovimento(input: {
+  id: number; valor: number; descricao: string; categoria: string; tipo: string;
+}): Promise<ResultadoAcao> {
+  if (!(input.valor > 0)) return { ok: false, erro: "Informe um valor maior que zero." };
+  if (input.tipo === "despesa" && !input.categoria.trim()) return { ok: false, erro: "Escolha a categoria." };
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { error } = await supabase.from("cash_movements")
+    .update({
+      valor: input.valor,
+      descricao: input.descricao.trim() || null,
+      categoria: input.tipo === "despesa" ? (input.categoria.trim() || null) : null,
+    })
+    .eq("id", input.id);
+  if (error) return { ok: false, erro: "Não foi possível salvar." };
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Reabre um caixa fechado para correção (limpa o fechamento). */
+export async function reabrirCaixa(formData: FormData) {
+  const dia = String(formData.get("dia"));
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { data, error } = await supabase.from("cash_sessions")
+    .update({
+      status: "aberto",
+      saldo_contado: null, saldo_calculado: null, diferenca: null,
+      fechado_por: null, fechado_em: null,
+    })
+    .eq("dia", dia).eq("status", "fechado").select("id");
+  if (error) throw new Error("Não foi possível reabrir: " + error.message);
+  if (!data || data.length === 0) throw new Error("Caixa não está fechado.");
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/");
+}
+
 export async function fecharCaixa(formData: FormData): Promise<ResultadoAcao> {
   try {
   const dia = String(formData.get("dia"));

@@ -2,10 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { hojeBR, limitesDoDiaBR } from "@/lib/datas";
 import { calcularSaldoCaixa } from "@/lib/caixa-fisico";
 import { formatBRL } from "@/lib/format";
-import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { NavData } from "@/components/NavData";
-import { BotaoAbrir, FormSaque, FormDespesa, FormFechar } from "./FormsCaixa";
-import { removerMovimento } from "./actions";
+import {
+  BotaoAbrir, FormSaque, FormDespesa, FormFechar,
+  SaldoInicialEditavel, LinhaMovimento, BotaoReabrir,
+} from "./FormsCaixa";
 
 export default async function CaixaPage({ searchParams }: { searchParams: { dia?: string } }) {
   const dia = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.dia ?? "") ? searchParams.dia! : hojeBR();
@@ -68,7 +69,9 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
       ) : (
         <>
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-slate-200 sm:grid-cols-4">
-            <Mini titulo="Saldo inicial" valor={formatBRL(sessao.saldo_inicial)} />
+            <Mini titulo="Saldo inicial" valor={sessao.status === "aberto"
+              ? <SaldoInicialEditavel dia={dia} valor={Number(sessao.saldo_inicial)} />
+              : formatBRL(sessao.saldo_inicial)} />
             <Mini titulo="Entradas" valor={formatBRL(r.totalSaques + r.totalVendas)} cor="text-marca-green-dark" />
             <Mini titulo="Saídas" valor={formatBRL(r.totalCompras + r.totalDespesas)} cor="text-marca-gold" />
             <Mini titulo="Saldo calculado" valor={formatBRL(r.saldoCalculado)} cor="text-marca-teal-dark" />
@@ -89,6 +92,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
                   {(sessao.diferenca ?? 0) > 0 ? "(sobra)" : (sessao.diferenca ?? 0) < 0 ? "(falta)" : ""}
                 </b>
               </div>
+              <BotaoReabrir dia={dia} />
             </div>
           ) : (
             <div className="space-y-3 rounded-2xl border bg-white p-4">
@@ -130,20 +134,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
             <div className="border-b bg-slate-50 p-3 font-bold text-marca-navy">Lançamentos do dia</div>
             {movimentos.length === 0 ? <div className="p-4 text-center text-slate-400">Nenhum saque/despesa.</div> :
               movimentos.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 border-b p-3 last:border-0">
-                  <span className={"rounded-full px-2 py-0.5 text-xs font-bold " +
-                    (m.tipo === "saque" ? "bg-marca-green-dark/10 text-marca-green-dark" : "bg-marca-gold-light text-marca-gold")}>
-                    {m.tipo === "saque" ? "Saque" : m.categoria ?? "Despesa"}
-                  </span>
-                  <span className="text-slate-600">{m.descricao}</span>
-                  <span className={"ml-auto font-bold " + (m.tipo === "saque" ? "text-marca-green-dark" : "text-red-600")}>
-                    {m.tipo === "saque" ? "+" : "−"}{formatBRL(Number(m.valor))}
-                  </span>
-                  {sessao.status !== "fechado" ? (
-                    <BotaoConfirmar acao={removerMovimento} hidden={{ id: m.id }}
-                      mensagem="Remover este lançamento?" className="text-slate-400">🗑️</BotaoConfirmar>
-                  ) : null}
-                </div>
+                <LinhaMovimento key={m.id} m={m} podeEditar={sessao.status !== "fechado"} />
               ))}
           </div>
 
@@ -166,7 +157,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
   );
 }
 
-function Mini({ titulo, valor, cor = "text-marca-navy" }: { titulo: string; valor: string; cor?: string }) {
+function Mini({ titulo, valor, cor = "text-marca-navy" }: { titulo: string; valor: React.ReactNode; cor?: string }) {
   return (
     <div className="bg-white px-3 py-2 text-center">
       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{titulo}</div>
