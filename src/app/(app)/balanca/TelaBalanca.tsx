@@ -180,7 +180,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const pctBtn = (on: boolean) => "rounded-lg px-3 py-1.5 text-sm font-bold " + (on ? "bg-marca-teal text-white" : "bg-slate-100 text-slate-600");
 
   return (
-    <div className="space-y-4">
+    <div className={"space-y-4 " + (cesta.length > 0 ? "pb-40" : "")}>
       {/* catador */}
       <div className="rounded-2xl border bg-white p-3">
         <div className="mb-2 flex gap-2">
@@ -315,23 +315,39 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
             <button onClick={() => remover(i)} className="rounded-lg bg-red-50 px-3 py-2 text-red-600">🗑️</button>
           </div>
         ))}
-        <div className="flex items-center justify-between p-4 text-2xl font-black">
-          <span>TOTAL</span><span className="text-marca-teal-dark">{formatBRL(total)}</span>
-        </div>
-        {catadorId != null && cesta.length > 0 ? (
-          <label className="flex cursor-pointer items-center gap-2 border-t px-4 py-3 text-sm font-semibold text-slate-600">
-            <input type="checkbox" checked={salvarPrecos} onChange={(e) => setSalvarPrecos(e.target.checked)}
-              className="h-5 w-5 accent-marca-teal" />
-            💾 Salvar estes preços para {catadorEfetivo?.nome} (vira o preço fixo dele)
-          </label>
+        {cesta.length > 0 ? (
+          <div className="flex items-center justify-between rounded-b-2xl border-t p-4 text-xl font-black">
+            <span className="text-slate-500">TOTAL</span><span className="text-marca-teal-dark">{formatBRL(total)}</span>
+          </div>
         ) : null}
-        <button onClick={finalizar} disabled={cesta.length === 0 || pending}
-          className="w-full rounded-b-2xl bg-marca-green p-5 text-2xl font-black text-white disabled:bg-slate-300">
-          {pending ? "Salvando..." : `💵 FINALIZAR E PAGAR ${cesta.length ? "(" + formatBRL(total) + ")" : ""}`}
-        </button>
       </div>
 
       {msg ? <p className="text-center text-lg font-bold">{msg}</p> : null}
+
+      {/* barra fixa: TOTAL + finalizar sempre na tela (não precisa rolar a lista) */}
+      {cesta.length > 0 && !sel ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 shadow-[0_-4px_16px_rgba(0,0,0,0.10)] backdrop-blur">
+          <div className="mx-auto max-w-5xl space-y-2 px-4 py-3">
+            {catadorId != null ? (
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600">
+                <input type="checkbox" checked={salvarPrecos} onChange={(e) => setSalvarPrecos(e.target.checked)}
+                  className="h-5 w-5 accent-marca-teal" />
+                💾 Salvar estes preços para {catadorEfetivo?.nome} (vira o preço fixo dele)
+              </label>
+            ) : null}
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col leading-tight">
+                <span className="text-xs font-bold uppercase text-slate-400">Total ({cesta.length} {cesta.length === 1 ? "item" : "itens"})</span>
+                <span className="text-2xl font-black text-marca-navy">{formatBRL(total)}</span>
+              </div>
+              <button onClick={finalizar} disabled={pending}
+                className="ml-auto flex-1 rounded-xl bg-marca-green p-4 text-xl font-black text-white active:scale-95 disabled:bg-slate-300">
+                {pending ? "Salvando..." : "💵 FINALIZAR E PAGAR"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* teclado */}
       {sel ? (
