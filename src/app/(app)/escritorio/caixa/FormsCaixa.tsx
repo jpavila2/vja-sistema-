@@ -11,7 +11,9 @@ import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { formatBRL } from "@/lib/format";
 
 const inp = "rounded-xl border p-2 text-base";
-const btnTeal = "rounded-full bg-marca-teal px-4 py-2 text-sm font-bold text-white hover:bg-marca-teal-dark disabled:opacity-50";
+const erroCls = " border-red-500 ring-1 ring-red-500";
+const btnGreen = "rounded-full bg-marca-green px-4 py-2 text-sm font-bold text-white hover:bg-marca-green-dark disabled:opacity-50";
+const btnRed = "rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50";
 
 const CATEGORIAS_DESPESA = [
   "Combustível", "Segurança", "Alimentação / Café",
@@ -19,6 +21,13 @@ const CATEGORIAS_DESPESA = [
 ];
 
 const num = (s: string) => parseFloat(s.replace(",", ".")) || 0;
+
+/** Leva o foco e a rolagem direto pro campo com problema. */
+function focarCampo(id: string) {
+  const el = document.getElementById(id);
+  el?.focus();
+  el?.scrollIntoView({ block: "center", behavior: "smooth" });
+}
 
 type Msg = { ok: boolean; txt: string } | null;
 
@@ -29,6 +38,11 @@ function Aviso({ msg }: { msg: Msg }) {
       {msg.txt}
     </span>
   );
+}
+
+/** Marcador vermelho com ✗ apontando o campo que precisa ser resolvido. */
+function Falta({ texto }: { texto: string }) {
+  return <span className="flex items-center gap-1 text-sm font-bold text-red-600">✗ {texto}</span>;
 }
 
 export function BotaoAbrir({ dia }: { dia: string }) {
@@ -43,14 +57,20 @@ export function BotaoAbrir({ dia }: { dia: string }) {
 export function FormSaque({ dia }: { dia: string }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [msg, setMsg] = useState<Msg>(null);
+  const [erro, setErro] = useState<"" | "valor">("");
   const [rk, setRk] = useState(0);
   const [pending, start] = useTransition();
 
   function enviar(fd: FormData) {
+    if (!(num(String(fd.get("valor") ?? "")) > 0)) {
+      setErro("valor"); setMsg(null); focarCampo("saque-valor");
+      return;
+    }
+    setErro("");
     start(async () => {
       const res = await lancarMovimento(fd);
       if (res.ok) { setMsg({ ok: true, txt: "✅ Saque lançado" }); formRef.current?.reset(); setRk((k) => k + 1); }
-      else setMsg({ ok: false, txt: res.erro });
+      else { setMsg({ ok: false, txt: res.erro }); setErro("valor"); focarCampo("saque-valor"); }
     });
   }
 
@@ -59,9 +79,9 @@ export function FormSaque({ dia }: { dia: string }) {
       <input type="hidden" name="dia" value={dia} />
       <input type="hidden" name="tipo" value="saque" />
       <input name="descricao" placeholder="Descrição (ex: saque banco)" className={inp} />
-      <CampoDinheiro key={rk} name="valor" placeholder="R$ 0,00" className={inp + " w-32"} />
-      <button disabled={pending} className={btnTeal}>{pending ? "Salvando…" : "+ Saque (entrada)"}</button>
-      <Aviso msg={msg} />
+      <CampoDinheiro key={rk} id="saque-valor" erro={erro === "valor"} name="valor" placeholder="R$ 0,00" className={inp + " w-32"} />
+      <button disabled={pending} className={btnGreen}>{pending ? "Salvando…" : "+ Saque (entrada)"}</button>
+      {erro === "valor" ? <Falta texto="informe o valor" /> : <Aviso msg={msg} />}
     </form>
   );
 }
@@ -71,11 +91,22 @@ export function FormDespesa({ dia }: { dia: string }) {
   const [cat, setCat] = useState("");
   const [outro, setOutro] = useState("");
   const [msg, setMsg] = useState<Msg>(null);
+  const [erro, setErro] = useState<"" | "categoria" | "valor">("");
   const [rk, setRk] = useState(0);
   const [pending, start] = useTransition();
   const categoriaFinal = cat === "__outros__" ? outro.trim() : cat;
 
   function enviar(fd: FormData) {
+    if (!categoriaFinal) {
+      setErro("categoria"); setMsg(null);
+      focarCampo(cat === "__outros__" ? "desp-outro" : "desp-cat");
+      return;
+    }
+    if (!(num(String(fd.get("valor") ?? "")) > 0)) {
+      setErro("valor"); setMsg(null); focarCampo("desp-valor");
+      return;
+    }
+    setErro("");
     start(async () => {
       const res = await lancarMovimento(fd);
       if (res.ok) {
@@ -90,33 +121,41 @@ export function FormDespesa({ dia }: { dia: string }) {
       <input type="hidden" name="dia" value={dia} />
       <input type="hidden" name="tipo" value="despesa" />
       <input type="hidden" name="categoria" value={categoriaFinal} />
-      <select value={cat} onChange={(e) => setCat(e.target.value)} required
-        className={inp + (cat ? "" : " text-slate-400")}>
+      <select id="desp-cat" value={cat} onChange={(e) => { setCat(e.target.value); if (erro === "categoria") setErro(""); }}
+        className={inp + (cat ? "" : " text-slate-400") + (erro === "categoria" ? erroCls : "")}>
         <option value="" disabled>Categoria…</option>
         {CATEGORIAS_DESPESA.map((c) => <option key={c} value={c}>{c}</option>)}
         <option value="__outros__">Outros (digitar)…</option>
       </select>
       {cat === "__outros__" && (
-        <input value={outro} onChange={(e) => setOutro(e.target.value)} autoFocus required
-          placeholder="Qual categoria?" className={inp} />
+        <input id="desp-outro" value={outro} onChange={(e) => { setOutro(e.target.value); if (erro === "categoria") setErro(""); }} autoFocus
+          placeholder="Qual categoria?" className={inp + (erro === "categoria" ? erroCls : "")} />
       )}
       <input name="descricao" placeholder="Descrição (ex: caminhão branco)" className={inp} />
-      <CampoDinheiro key={rk} name="valor" placeholder="R$ 0,00" className={inp + " w-32"} />
-      <button disabled={pending} className={btnTeal}>{pending ? "Salvando…" : "+ Despesa (saída)"}</button>
-      <Aviso msg={msg} />
+      <CampoDinheiro key={rk} id="desp-valor" erro={erro === "valor"} name="valor" placeholder="R$ 0,00" className={inp + " w-32"} />
+      <button disabled={pending} className={btnRed}>{pending ? "Salvando…" : "+ Despesa (saída)"}</button>
+      {erro === "categoria" ? <Falta texto="escolha a categoria" />
+        : erro === "valor" ? <Falta texto="informe o valor" />
+        : <Aviso msg={msg} />}
     </form>
   );
 }
 
 export function FormFechar({ dia }: { dia: string }) {
   const [msg, setMsg] = useState<Msg>(null);
+  const [erro, setErro] = useState<"" | "contado">("");
   const [pending, start] = useTransition();
 
   function enviar(fd: FormData) {
+    if (!String(fd.get("contado") ?? "")) {
+      setErro("contado"); setMsg(null); focarCampo("fechar-contado");
+      return;
+    }
     if (!confirm("Fechar o caixa do dia? O saldo contado vira a abertura de amanhã.")) return;
+    setErro("");
     start(async () => {
       const res = await fecharCaixa(fd);
-      if (!res.ok) setMsg({ ok: false, txt: res.erro });
+      if (!res.ok) { setMsg({ ok: false, txt: res.erro }); setErro("contado"); focarCampo("fechar-contado"); }
       // sucesso: a página recarrega mostrando "Caixa fechado"
     });
   }
@@ -124,11 +163,11 @@ export function FormFechar({ dia }: { dia: string }) {
   return (
     <form action={enviar} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="dia" value={dia} />
-      <CampoDinheiro name="contado" placeholder="Dinheiro contado na gaveta" className={inp + " w-56"} />
+      <CampoDinheiro id="fechar-contado" erro={erro === "contado"} name="contado" placeholder="Dinheiro contado na gaveta" className={inp + " w-56"} />
       <button disabled={pending} className="rounded-full bg-marca-navy px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
         {pending ? "Fechando…" : "Fechar e conferir"}
       </button>
-      <Aviso msg={msg} />
+      {erro === "contado" ? <Falta texto="conte e informe o dinheiro da gaveta" /> : <Aviso msg={msg} />}
     </form>
   );
 }

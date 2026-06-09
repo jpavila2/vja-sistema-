@@ -98,7 +98,6 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
             <div className="space-y-3 rounded-2xl border bg-white p-4">
               <FormSaque dia={dia} />
               <FormDespesa dia={dia} />
-              <div className="border-t pt-3"><FormFechar dia={dia} /></div>
             </div>
           )}
 
@@ -149,6 +148,14 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
           {vendasOutras.length > 0 ? (
             <div className="rounded-2xl border border-dashed bg-white p-3 text-sm text-slate-500">
               📲 {vendasOutras.length} venda(s) via PIX/Transferência/Boleto/Cheque somando {formatBRL(totalVendasOutras)} — não entraram na gaveta.
+            </div>
+          ) : null}
+
+          {/* fechar o caixa — sempre no fim da aba */}
+          {sessao.status !== "fechado" ? (
+            <div className="rounded-2xl border-2 border-marca-navy/20 bg-white p-4">
+              <div className="mb-2 font-bold text-marca-navy">Fechar o caixa do dia</div>
+              <FormFechar dia={dia} />
             </div>
           ) : null}
         </>
