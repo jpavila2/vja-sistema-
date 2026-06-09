@@ -140,9 +140,9 @@ export default async function PainelPage({ searchParams }: { searchParams: { mes
         <section>
           <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-slate-500">Hoje</h2>
           <div className="grid gap-4 sm:grid-cols-3">
-            <CardResumo titulo="Comprado hoje" valor={formatBRL(totalCompradoHoje)} cor="teal" />
-            <CardResumo titulo="Compras hoje" valor={cH.length} cor="navy" />
-            <CardResumo titulo="Ticket médio" valor={formatBRL(cH.length ? r2(totalCompradoHoje / cH.length) : 0)} cor="gold" />
+            <CardResumo titulo="Comprado hoje" valor={formatBRL(totalCompradoHoje)} cor="teal" href={`/escritorio/conferencia?dia=${hoje}`} />
+            <CardResumo titulo="Compras hoje" valor={cH.length} cor="navy" href={`/escritorio/conferencia?dia=${hoje}`} />
+            <CardResumo titulo="Ticket médio" valor={formatBRL(cH.length ? r2(totalCompradoHoje / cH.length) : 0)} cor="gold" href={`/escritorio/conferencia?dia=${hoje}`} />
           </div>
         </section>
       )}
@@ -163,14 +163,15 @@ export default async function PainelPage({ searchParams }: { searchParams: { mes
           </form>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <CardResumo titulo="Vendido" valor={formatBRL(totalVendidoMes)} cor="green" />
-          <CardResumo titulo="Comprado" valor={formatBRL(totalCompradoMes)} cor="gold" />
-          <CardResumo titulo="Despesas" valor={formatBRL(totalDespesasMes)} cor="navy" />
+          <CardResumo titulo="Vendido" valor={formatBRL(totalVendidoMes)} cor="green" href={`/escritorio/historico?mes=${mes}`} />
+          <CardResumo titulo="Comprado" valor={formatBRL(totalCompradoMes)} cor="gold" href={`/escritorio/historico?mes=${mes}`} />
+          <CardResumo titulo="Despesas" valor={formatBRL(totalDespesasMes)} cor="navy" href={`/escritorio/historico?mes=${mes}`} />
           <CardResumo
             titulo="Resultado do mês"
             valor={formatBRL(Math.abs(resultadoLiquido))}
             cor={resultadoLiquido >= 0 ? "green" : "gold"}
             sufixo={resultadoLiquido >= 0 ? "▲ lucro" : "▼ no vermelho"}
+            href="/escritorio/relatorio"
           />
         </div>
 
@@ -229,8 +230,10 @@ export default async function PainelPage({ searchParams }: { searchParams: { mes
                 return (
                   <tr key={m.id} className="border-t hover:bg-slate-50">
                     <td className="p-3">
-                      <span className="mr-2">{m.emoji}</span>
-                      {m.nome}
+                      <Link href={`/escritorio/materiais/editar/${m.id}`} className="inline-flex items-center hover:underline">
+                        <span className="mr-2">{m.emoji}</span>
+                        {m.nome}
+                      </Link>
                     </td>
                     <td className={"p-3 text-right font-bold " + (zero ? "text-red-600" : baixo ? "text-amber-600" : "text-marca-teal-dark")}>
                       {Number(m.estoque_atual).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} {m.unidade}

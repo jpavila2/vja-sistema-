@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { limitesMes, mesAtual, nomeMes } from "@/lib/datas";
+import { limitesMes, limitesMesData, mesAtual, nomeMes } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -8,23 +8,29 @@ type Linha = {
   id: number; data_hora: string; total: number; status: string;
   forma_pagamento?: string; people?: { nome: string } | null;
 };
+type Despesa = { id: number; dia: string; categoria: string | null; descricao: string | null; valor: number };
 
 export default async function HistoricoPage({ searchParams }: { searchParams: { mes?: string } }) {
   const mes = /^\d{4}-\d{2}$/.test(searchParams.mes ?? "") ? searchParams.mes! : mesAtual();
   const { inicio, fim } = limitesMes(mes);
+  const { ini: diaIni, fim: diaFim } = limitesMesData(mes);
   const supabase = await createClient();
 
-  const [{ data: vendasData }, { data: comprasData }] = await Promise.all([
+  const [{ data: vendasData }, { data: comprasData }, { data: despesasData }] = await Promise.all([
     supabase.from("sales").select("id, data_hora, total, status, forma_pagamento, people(nome)")
       .gte("data_hora", inicio).lt("data_hora", fim).order("data_hora", { ascending: false }),
     supabase.from("purchases").select("id, data_hora, total, status, forma_pagamento, people(nome)")
       .gte("data_hora", inicio).lt("data_hora", fim).order("data_hora", { ascending: false }),
+    supabase.from("cash_movements").select("id, dia, categoria, descricao, valor")
+      .eq("tipo", "despesa").gte("dia", diaIni).lt("dia", diaFim).order("dia", { ascending: false }),
   ]);
 
   const vendas = (vendasData as unknown as Linha[]) ?? [];
   const compras = (comprasData as unknown as Linha[]) ?? [];
+  const despesas = (despesasData as unknown as Despesa[]) ?? [];
   const totalVendas = r2(vendas.filter((v) => v.status === "ativa").reduce((s, v) => s + Number(v.total), 0));
   const totalCompras = r2(compras.filter((c) => c.status !== "cancelada").reduce((s, c) => s + Number(c.total), 0));
+  const totalDespesas = r2(despesas.reduce((s, d) => s + Number(d.valor), 0));
 
   return (
     <div className="space-y-5">
@@ -41,6 +47,31 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
           linhas={vendas} rotuloPessoa="Cliente" vazio="Nenhuma venda no mês." />
         <Tabela titulo="⚖️ Compras" total={totalCompras} cor="text-marca-gold"
           linhas={compras} rotuloPessoa="Catador" vazio="Nenhuma compra no mês." />
+      </div>
+
+      <div className="rounded-2xl border bg-white">
+        <div className="flex items-center justify-between border-b bg-slate-50 p-3">
+          <span className="font-bold text-marca-navy">💸 Despesas <span className="text-slate-400">({despesas.length})</span></span>
+          <span className="font-extrabold text-red-600">{formatBRL(totalDespesas)}</span>
+        </div>
+        {despesas.length === 0 ? (
+          <div className="p-6 text-center text-slate-400">Nenhuma despesa no mês.</div>
+        ) : (
+          <div className="max-h-[28rem] overflow-y-auto">
+            {despesas.map((d) => (
+              <div key={d.id} className="flex items-center gap-3 border-b p-3 last:border-0">
+                <div className="w-14 shrink-0 text-xs font-bold text-slate-500">
+                  {new Date(`${d.dia}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{d.categoria ?? "Sem categoria"}</div>
+                  {d.descricao ? <div className="truncate text-xs text-slate-400">{d.descricao}</div> : null}
+                </div>
+                <span className="font-bold text-red-600">{formatBRL(Number(d.valor))}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
