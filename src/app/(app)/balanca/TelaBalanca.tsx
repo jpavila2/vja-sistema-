@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
 import { calcTotalCompra, pesoLiquido } from "@/lib/compra";
-import { registrarCompra } from "./actions";
+import { registrarCompra, criarCatador, precosDoCatador, salvarPrecosCatador } from "./actions";
 import { buscarCatadores, resolverCatador, type CatadorOpt } from "@/lib/catador";
 import type { Material, ItemCesta, Pessoa } from "@/lib/types";
 
@@ -36,6 +36,9 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const [buscaMat, setBuscaMat] = useState("");
   const [reqId, setReqId] = useState<string>(() => crypto.randomUUID());
   const [pending, startTransition] = useTransition();
+  const [precosCatador, setPrecosCatador] = useState<Record<number, number>>({}); // preços próprios do catador
+  const [salvarPrecos, setSalvarPrecos] = useState(false); // checkbox "salvar preços deste catador"
+  const [salvandoCat, setSalvandoCat] = useState(false); // botão "Salvar catador" do cadastro rápido
 
   const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
   const materiaisFiltrados = buscaMat.trim()
@@ -47,6 +50,15 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const resol = resolverCatador(fornecedores, busca);
   const catadorEfetivo: CatadorOpt | null =
     catadorSel ?? (resol.tipo === "ok" ? { id: resol.id, nome: resol.nome } : null);
+  const catadorId = catadorEfetivo?.id ?? null;
+
+  // carrega os preços próprios do catador quando ele muda
+  useEffect(() => {
+    if (catadorId == null) { setPrecosCatador({}); setSalvarPrecos(false); return; }
+    let ativo = true;
+    precosDoCatador(catadorId).then((m) => { if (ativo) setPrecosCatador(m); });
+    return () => { ativo = false; };
+  }, [catadorId]);
 
   const peso = parseFloat(pesoStr.replace(",", ".")) || 0;
   const kgBag = parseFloat(kgBagStr.replace(",", ".")) || 0;
@@ -59,7 +71,9 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   function abrir(m: Material) {
     setSel(m); setPesoStr("0"); setPct(0); setPctStr("");
     setBags(0); setKgBagStr("3"); setBagsCustom(false);
-    setPrecoStr(m.preco_compra > 0 ? String(m.preco_compra) : "");
+    // preço do catador (se tiver) tem prioridade sobre o preço de tabela
+    const precoBase = precosCatador[m.id] ?? m.preco_compra;
+    setPrecoStr(precoBase > 0 ? String(precoBase) : "");
   }
   function tecla(k: string) {
     setPesoStr((c) => (k === "back" ? (c.length > 1 ? c.slice(0, -1) : "0") : k === "," ? (c.includes(",") ? c : c + ",") : c === "0" ? k : c + k));
@@ -106,6 +120,30 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
     return "Toque no nome do catador na lista ou use o + para cadastrar";
   }
 
+  // cadastra o catador na hora (cadastro rápido) e já o seleciona como conhecido
+  function salvarCatadorNovo() {
+    if (salvandoCat) return;
+    if (novoNome.trim() === "") { setMsg("Digite o nome do catador"); return; }
+    setSalvandoCat(true);
+    startTransition(async () => {
+      const res = await criarCatador(novoNome, novoTel);
+      setSalvandoCat(false);
+      if (res.ok) {
+        setCatadorSel({ id: res.id, nome: res.nome });
+        setBusca(res.nome); setNovoNome(""); setNovoTel("");
+        setModo("conhecido"); setMostrarSug(false);
+        setMsg(`✅ Catador "${res.nome}" cadastrado`);
+      } else setMsg("Erro ao cadastrar catador: " + res.erro);
+    });
+  }
+
+  // preços usados nesta compra, um por material (último valor vence)
+  function precosDaCesta(): { material_id: number; preco: number | null }[] {
+    const mapa = new Map<number, number>();
+    cesta.forEach((i) => mapa.set(i.material_id, i.preco_unitario));
+    return Array.from(mapa, ([material_id, preco]) => ({ material_id, preco }));
+  }
+
   function finalizar() {
     if (pending) return; // trava duplo-clique
     if (cesta.length === 0) return;
@@ -120,9 +158,14 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
           client_request_id: reqId,
         });
         if (res.ok) {
+          // salva os preços desta compra como preços fixos do catador, se marcado
+          if (salvarPrecos && cat.pessoa_id != null) {
+            await salvarPrecosCatador(cat.pessoa_id, precosDaCesta());
+          }
           setMsg(`✅ Compra salva — ${formatBRL(total)}`);
           setCesta([]); setNovoNome(""); setNovoTel(""); setBusca("");
           setCatadorSel(null); setMostrarSug(false); setModo("conhecido");
+          setSalvarPrecos(false); setPrecosCatador({});
           setReqId(crypto.randomUUID()); // nova chave para a próxima compra
         } else setMsg("Erro: " + res.erro);
       } catch (e) {
@@ -180,7 +223,12 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
               </ul>
             ) : null}
             {catadorEfetivo ? (
-              <p className="mt-2 text-sm font-bold text-marca-teal-dark">Pagando para: {catadorEfetivo.nome}</p>
+              <p className="mt-2 text-sm font-bold text-marca-teal-dark">
+                Pagando para: {catadorEfetivo.nome}
+                {Object.keys(precosCatador).length > 0 ? (
+                  <span className="ml-1 font-semibold text-slate-500">· usando os preços dele</span>
+                ) : null}
+              </p>
             ) : busca.trim() !== "" ? (
               <p className="mt-2 text-sm text-amber-600">
                 {resol.tipo === "ambiguo"
@@ -190,11 +238,18 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
             ) : null}
           </div>
         ) : modo === "novo" ? (
-          <div className="flex flex-wrap gap-2">
-            <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome do catador"
-              className="min-w-[12rem] flex-1 rounded-xl border p-3 text-base" />
-            <input value={novoTel} onChange={(e) => setNovoTel(e.target.value)} placeholder="Telefone (opcional)"
-              className="min-w-[10rem] flex-1 rounded-xl border p-3 text-base" />
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome do catador"
+                className="min-w-[12rem] flex-1 rounded-xl border p-3 text-base" />
+              <input value={novoTel} onChange={(e) => setNovoTel(e.target.value)} placeholder="Telefone (opcional)"
+                className="min-w-[10rem] flex-1 rounded-xl border p-3 text-base" />
+              <button type="button" onClick={salvarCatadorNovo} disabled={salvandoCat || novoNome.trim() === ""}
+                className="shrink-0 rounded-xl bg-marca-green px-5 py-3 text-base font-black text-white active:scale-95 disabled:bg-slate-300">
+                {salvandoCat ? "Salvando…" : "Salvar"}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">💡 Salve o catador agora pra já usar e guardar os preços dele.</p>
           </div>
         ) : (
           <p className="text-sm text-slate-500">Compra avulsa (catador não cadastrado).</p>
@@ -263,6 +318,13 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
         <div className="flex items-center justify-between p-4 text-2xl font-black">
           <span>TOTAL</span><span className="text-marca-teal-dark">{formatBRL(total)}</span>
         </div>
+        {catadorId != null && cesta.length > 0 ? (
+          <label className="flex cursor-pointer items-center gap-2 border-t px-4 py-3 text-sm font-semibold text-slate-600">
+            <input type="checkbox" checked={salvarPrecos} onChange={(e) => setSalvarPrecos(e.target.checked)}
+              className="h-5 w-5 accent-marca-teal" />
+            💾 Salvar estes preços para {catadorEfetivo?.nome} (vira o preço fixo dele)
+          </label>
+        ) : null}
         <button onClick={finalizar} disabled={cesta.length === 0 || pending}
           className="w-full rounded-b-2xl bg-marca-green p-5 text-2xl font-black text-white disabled:bg-slate-300">
           {pending ? "Salvando..." : `💵 FINALIZAR E PAGAR ${cesta.length ? "(" + formatBRL(total) + ")" : ""}`}

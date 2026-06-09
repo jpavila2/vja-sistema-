@@ -41,3 +41,48 @@ export async function registrarCompra(payload: unknown): Promise<ResultadoCompra
   revalidatePath("/escritorio/materiais");
   return { ok: true, id: data as number };
 }
+
+/** Cria um catador na hora (sem esperar finalizar a compra). */
+export async function criarCatador(
+  nome: string,
+  telefone: string,
+): Promise<{ ok: true; id: number; nome: string } | { ok: false; erro: string }> {
+  const nomeLimpo = nome.trim();
+  if (nomeLimpo === "") return { ok: false, erro: "Informe o nome do catador" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("criar_catador", {
+    p_nome: nomeLimpo,
+    p_telefone: telefone.trim(),
+  });
+  if (error) return { ok: false, erro: error.message };
+  return { ok: true, id: data as number, nome: nomeLimpo };
+}
+
+/** Preços próprios de um catador: mapa material_id -> preço. */
+export async function precosDoCatador(pessoaId: number): Promise<Record<number, number>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("catador_precos")
+    .select("material_id, preco_compra")
+    .eq("pessoa_id", pessoaId);
+  const mapa: Record<number, number> = {};
+  for (const r of (data ?? []) as { material_id: number; preco_compra: number }[]) {
+    mapa[r.material_id] = Number(r.preco_compra);
+  }
+  return mapa;
+}
+
+/** Salva/atualiza os preços próprios de um catador. preco null => volta ao de tabela. */
+export async function salvarPrecosCatador(
+  pessoaId: number,
+  precos: { material_id: number; preco: number | null }[],
+): Promise<{ ok: boolean; erro?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("salvar_precos_catador", {
+    p_pessoa_id: pessoaId,
+    p_precos: precos,
+  });
+  if (error) return { ok: false, erro: error.message };
+  revalidatePath("/balanca");
+  return { ok: true };
+}
