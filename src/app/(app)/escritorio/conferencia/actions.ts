@@ -18,6 +18,32 @@ export async function conferirCompra(formData: FormData) {
   revalidatePath("/escritorio/caixa");
 }
 
+type ItemEdicao = { material_id: number; peso_liquido: number; preco_unitario: number };
+
+export async function editarCompra(input: {
+  id: number;
+  forma_pagamento: string;
+  itens: ItemEdicao[];
+}) {
+  if (!input.itens || input.itens.length === 0) {
+    throw new Error("A compra precisa de ao menos um item.");
+  }
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { error } = await supabase.rpc("editar_compra", {
+    p_id: input.id,
+    p_forma_pagamento: input.forma_pagamento === "pix" ? "pix" : "dinheiro",
+    p_itens: input.itens.map((i) => ({
+      material_id: i.material_id,
+      peso_liquido: i.peso_liquido,
+      preco_unitario: i.preco_unitario,
+    })),
+  });
+  if (error) throw new Error("Não foi possível salvar a edição: " + error.message);
+  revalidatePath("/escritorio/conferencia");
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/escritorio/materiais");
+}
+
 export async function cancelarCompra(formData: FormData) {
   const id = Number(formData.get("id"));
   const motivo = String(formData.get("motivo") ?? "");
