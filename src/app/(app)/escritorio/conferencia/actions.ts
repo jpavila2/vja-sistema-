@@ -44,6 +44,27 @@ export async function editarCompra(input: {
   revalidatePath("/escritorio/materiais");
 }
 
+export async function alterarDataCompra(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const data = String(formData.get("data") ?? ""); // yyyy-mm-dd
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error("Data inválida.");
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  // preserva o horário original (fuso de São Paulo, UTC-3 fixo)
+  const { data: row, error: e1 } = await supabase
+    .from("purchases").select("data_hora").eq("id", id).single();
+  if (e1 || !row) throw new Error("Compra não encontrada.");
+  const hora = new Date(row.data_hora).toLocaleTimeString("en-GB", {
+    timeZone: "America/Sao_Paulo", hour12: false,
+  }); // HH:mm:ss
+  const novaISO = `${data}T${hora}-03:00`;
+  const { error } = await supabase.from("purchases").update({ data_hora: novaISO }).eq("id", id);
+  if (error) throw new Error("Não foi possível mudar a data: " + error.message);
+  revalidatePath("/escritorio/conferencia");
+  revalidatePath("/escritorio/historico");
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/escritorio/relatorio");
+}
+
 export async function cancelarCompra(formData: FormData) {
   const id = Number(formData.get("id"));
   const motivo = String(formData.get("motivo") ?? "");

@@ -3,7 +3,11 @@
 import { useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
-import { conferirCompra, cancelarCompra, editarCompra, excluirCompra } from "./actions";
+import { conferirCompra, cancelarCompra, editarCompra, excluirCompra, alterarDataCompra } from "./actions";
+
+// yyyy-mm-dd no fuso de São Paulo (para o <input type="date">)
+const dataSP = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
 export type MaterialOpt = { id: number; nome: string; emoji: string | null; unidade: string; preco_compra: number };
 type Item = {
@@ -231,6 +235,19 @@ export function CardCompra({ compra: c, materiais }: { compra: Compra; materiais
             className="rounded-full border border-marca-teal px-4 py-2 text-sm font-bold text-marca-teal-dark hover:bg-marca-teal-light">
             ✏️ Editar
           </button>
+        ) : null}
+
+        {c.status !== "cancelada" ? (
+          <form action={alterarDataCompra} className="flex items-center gap-1">
+            <input type="hidden" name="id" value={c.id} />
+            <label className="text-xs font-bold text-slate-500">📅 Data</label>
+            <input type="date" name="data" defaultValue={dataSP(c.data_hora)}
+              aria-label="Data do lançamento"
+              className="rounded-full border px-2 py-1.5 text-sm font-semibold" />
+            <button className="rounded-full border px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+              Mudar
+            </button>
+          </form>
         ) : null}
 
         {c.status !== "cancelada" ? (
