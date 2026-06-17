@@ -3,13 +3,15 @@ import { hojeBR, limitesDoDiaBR } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
+import { NavData } from "@/components/NavData";
 import { cancelarVenda } from "./actions";
 import { TelaVendas } from "./TelaVendas";
 import { EditorClienteVenda } from "./EditorClienteVenda";
+import { EditorVenda } from "./EditorVenda";
 import type { Material, Pessoa, SaleWithPessoa } from "@/lib/types";
 
-export default async function VendasPage() {
-  const dia = hojeBR();
+export default async function VendasPage({ searchParams }: { searchParams: { dia?: string } }) {
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.dia ?? "") ? searchParams.dia! : hojeBR();
   const { inicio, fim } = limitesDoDiaBR(dia);
   const supabase = await createClient();
 
@@ -24,7 +26,7 @@ export default async function VendasPage() {
     supabase.from("people").select("id, nome").in("tipo", ["cliente","ambos"]).eq("status","ativo").order("nome"),
     supabase
       .from("sales")
-      .select("*, people(nome)")
+      .select("*, people(nome), sale_items(id, material_id, peso, preco_unitario, subtotal, materials(nome, emoji, unidade))")
       .gte("data_hora", inicio)
       .lt("data_hora", fim)
       .order("data_hora", { ascending: false }),
@@ -40,8 +42,12 @@ export default async function VendasPage() {
   ]);
 
   const materiais = (matsData as Material[]) ?? [];
+  const matsVenda = materiais.map((m) => ({
+    id: m.id, nome: m.nome, emoji: m.emoji, unidade: m.unidade, preco_venda: m.preco_venda,
+  }));
   const compradores = (compradoresData as Pick<Pessoa,"id"|"nome">[]) ?? [];
-  const vendas = (vendasData as SaleWithPessoa[]) ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vendas = (vendasData as (SaleWithPessoa & { sale_items: any[] })[]) ?? [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const aAtribuir = (atribuirData as any[]) ?? [];
   const isAdmin = profData?.papel === "admin";
@@ -55,16 +61,14 @@ export default async function VendasPage() {
       <RealtimeRefresh tables={["sales", "sale_items"]} canal="vendas" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-marca-navy">Vendas</h1>
-        <span className="text-sm text-slate-500">
-          {new Date(`${dia}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
-        </span>
+        <NavData dia={dia} base="/escritorio/vendas" />
       </div>
 
       {/* ── vendas do dia ── */}
       {vendas.length > 0 ? (
         <div className="rounded-2xl border bg-white">
           <div className="flex items-center justify-between border-b bg-slate-50 p-3">
-            <span className="font-bold text-marca-navy">Vendas de hoje</span>
+            <span className="font-bold text-marca-navy">Vendas do dia</span>
             <span className="font-extrabold text-marca-teal-dark">{formatBRL(totalDia)}</span>
           </div>
           {vendas.map((v) => (
@@ -91,6 +95,15 @@ export default async function VendasPage() {
               {v.status === "ativa" && (
                 <EditorClienteVenda saleId={v.id} compradores={compradores} />
               )}
+              {v.status === "ativa" && (
+                <EditorVenda
+                  saleId={v.id}
+                  dataHora={v.data_hora}
+                  formaPagamento={v.forma_pagamento}
+                  itens={v.sale_items ?? []}
+                  materiais={matsVenda}
+                />
+              )}
               {v.status === "ativa" && isAdmin ? (
                 <BotaoConfirmar
                   acao={cancelarVenda}
@@ -105,7 +118,7 @@ export default async function VendasPage() {
         </div>
       ) : (
         <div className="rounded-2xl border bg-white p-5 text-center text-slate-400">
-          Nenhuma venda registrada hoje.
+          Nenhuma venda registrada neste dia.
         </div>
       )}
 

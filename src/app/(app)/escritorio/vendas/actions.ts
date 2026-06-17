@@ -60,6 +60,52 @@ export async function trocarClienteVenda(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
+export async function alterarDataVenda(formData: FormData): Promise<void> {
+  const id = Number(formData.get("id"));
+  const data = String(formData.get("data") ?? ""); // yyyy-mm-dd
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error("Data inválida.");
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  // preserva o horário original (fuso de São Paulo, UTC-3 fixo)
+  const { data: row, error: e1 } = await supabase
+    .from("sales").select("data_hora").eq("id", id).single();
+  if (e1 || !row) throw new Error("Venda não encontrada.");
+  const hora = new Date(row.data_hora).toLocaleTimeString("en-GB", {
+    timeZone: "America/Sao_Paulo", hour12: false,
+  }); // HH:mm:ss
+  const novaISO = `${data}T${hora}-03:00`;
+  const { error } = await supabase.from("sales").update({ data_hora: novaISO }).eq("id", id);
+  if (error) throw new Error("Não foi possível mudar a data: " + error.message);
+  revalidatePath("/escritorio/vendas");
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/escritorio/relatorio");
+  revalidatePath("/escritorio/areceber");
+  revalidatePath("/");
+}
+
+export async function editarVenda(input: {
+  id: number;
+  forma_pagamento: string;
+  itens: { material_id: number; peso: number; preco_unitario: number }[];
+}): Promise<void> {
+  if (!input.itens || input.itens.length === 0) {
+    throw new Error("A venda precisa de ao menos um item.");
+  }
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { error } = await supabase.rpc("editar_venda", {
+    p_id: input.id,
+    p_forma_pagamento: input.forma_pagamento,
+    p_itens: input.itens.map((i) => ({
+      material_id: i.material_id, peso: i.peso, preco_unitario: i.preco_unitario,
+    })),
+  });
+  if (error) throw new Error("Não foi possível salvar a edição: " + error.message);
+  revalidatePath("/escritorio/vendas");
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/escritorio/relatorio");
+  revalidatePath("/escritorio/materiais");
+  revalidatePath("/");
+}
+
 export async function cancelarVenda(formData: FormData): Promise<void> {
   const id = Number(formData.get("id"));
   const motivo = String(formData.get("motivo") ?? "");
