@@ -238,7 +238,18 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   return (
     <div className={"space-y-4 " + (cesta.length > 0 ? "pb-40" : "")}>
       {/* barra de pesagens abertas (comandas) + fila offline */}
-      <BarraComandas comandas={comandas} ativaId={ativaId} onSelecionar={selecionar} onNova={nova} />
+      <BarraComandas
+        comandas={comandas}
+        ativaId={ativaId}
+        onSelecionar={selecionar}
+        onNova={nova}
+        onExcluir={(id) => {
+          const c = comandas.find((x) => x.id === id);
+          if (c && c.cesta.length > 0 && !confirm(`Excluir a pesagem de ${rotuloComanda(c)} com ${c.cesta.length} item(ns)? Não dá pra desfazer.`)) return;
+          if (id === ativaId) fecharModal();
+          encerrar(id);
+        }}
+      />
       <IndicadorFila pendentes={pendentes} />
 
       {/* catador */}
