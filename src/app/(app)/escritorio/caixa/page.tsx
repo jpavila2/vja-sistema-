@@ -32,8 +32,11 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const movimentos = (movs as any[]) ?? [];
-  const saques    = movimentos.filter((m) => m.tipo === "saque");
-  const despesas  = movimentos.filter((m) => m.tipo === "despesa");
+  const ehDinheiro = (m: { forma_pagamento?: string }) => (m.forma_pagamento ?? "dinheiro") === "dinheiro";
+  // só dinheiro mexe na gaveta; o resto fica fora do caixa físico
+  const saques     = movimentos.filter((m) => m.tipo === "saque" && ehDinheiro(m));
+  const despesas   = movimentos.filter((m) => m.tipo === "despesa" && ehDinheiro(m));
+  const foraDoCaixa = movimentos.filter((m) => !ehDinheiro(m));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const comprasDin  = ((comprasData  as any[]) ?? []).filter((c) => c.status !== "cancelada");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -130,14 +133,26 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
             </div>
           ) : null}
 
-          {/* lançamentos manuais */}
+          {/* lançamentos manuais em dinheiro (gaveta) */}
           <div className="rounded-2xl border bg-white">
-            <div className="border-b bg-slate-50 p-3 font-bold text-marca-navy">Lançamentos do dia</div>
-            {movimentos.length === 0 ? <div className="p-4 text-center text-slate-400">Nenhum saque/despesa.</div> :
-              movimentos.map((m) => (
+            <div className="border-b bg-slate-50 p-3 font-bold text-marca-navy">Lançamentos em dinheiro (gaveta)</div>
+            {[...saques, ...despesas].length === 0 ? <div className="p-4 text-center text-slate-400">Nenhum saque/despesa em dinheiro.</div> :
+              [...saques, ...despesas].map((m) => (
                 <LinhaMovimento key={m.id} m={m} podeEditar={sessao.status !== "fechado"} />
               ))}
           </div>
+
+          {/* movimentos fora do caixa (PIX/banco) — não mexem na gaveta */}
+          {foraDoCaixa.length > 0 ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/40">
+              <div className="border-b border-amber-200 p-3 font-bold text-amber-800">
+                Movimentos fora do caixa (PIX/banco) — não entram na conta da gaveta
+              </div>
+              {foraDoCaixa.map((m) => (
+                <LinhaMovimento key={m.id} m={m} podeEditar={sessao.status !== "fechado"} />
+              ))}
+            </div>
+          ) : null}
 
           {/* informativo PIX compras */}
           {comprasPix.length > 0 ? (

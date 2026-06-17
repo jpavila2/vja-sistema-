@@ -22,6 +22,17 @@ const CATEGORIAS_DESPESA = [
 
 const num = (s: string) => parseFloat(s.replace(",", ".")) || 0;
 
+const FORMAS_PGTO = [
+  { v: "dinheiro", label: "💵 Dinheiro (gaveta)" },
+  { v: "pix", label: "📲 PIX (fora do caixa)" },
+  { v: "transferencia", label: "🏦 Transferência (fora do caixa)" },
+  { v: "boleto", label: "📄 Boleto (fora do caixa)" },
+  { v: "cheque", label: "📑 Cheque (fora do caixa)" },
+];
+const FORMA_CURTA: Record<string, string> = {
+  dinheiro: "Dinheiro", pix: "PIX", transferencia: "Transferência", boleto: "Boleto", cheque: "Cheque",
+};
+
 /** Leva o foco e a rolagem direto pro campo com problema. */
 function focarCampo(id: string) {
   const el = document.getElementById(id);
@@ -79,6 +90,9 @@ export function FormSaque({ dia }: { dia: string }) {
       <input type="hidden" name="dia" value={dia} />
       <input type="hidden" name="tipo" value="saque" />
       <input name="descricao" placeholder="Descrição (ex: saque banco)" className={inp} />
+      <select name="forma_pagamento" defaultValue="dinheiro" aria-label="Forma de pagamento" className={inp + " text-sm"}>
+        {FORMAS_PGTO.map((f) => <option key={f.v} value={f.v}>{f.label}</option>)}
+      </select>
       <CampoDinheiro key={rk} id="saque-valor" erro={erro === "valor"} name="valor" placeholder="R$ 0,00" className={inp + " w-32"} />
       <button disabled={pending} className={btnGreen}>{pending ? "Salvando…" : "+ Saque (entrada)"}</button>
       {erro === "valor" ? <Falta texto="informe o valor" /> : <Aviso msg={msg} />}
@@ -132,6 +146,9 @@ export function FormDespesa({ dia }: { dia: string }) {
           placeholder="Qual categoria?" className={inp + (erro === "categoria" ? erroCls : "")} />
       )}
       <input name="descricao" placeholder="Descrição (ex: caminhão branco)" className={inp} />
+      <select name="forma_pagamento" defaultValue="dinheiro" aria-label="Forma de pagamento" className={inp + " text-sm"}>
+        {FORMAS_PGTO.map((f) => <option key={f.v} value={f.v}>{f.label}</option>)}
+      </select>
       <CampoDinheiro key={rk} id="desp-valor" erro={erro === "valor"} name="valor" placeholder="R$ 0,00" className={inp + " w-32"} />
       <button disabled={pending} className={btnRed}>{pending ? "Salvando…" : "+ Despesa (saída)"}</button>
       {erro === "categoria" ? <Falta texto="escolha a categoria" />
@@ -209,7 +226,7 @@ export function SaldoInicialEditavel({ dia, valor }: { dia: string; valor: numbe
   );
 }
 
-type Movimento = { id: number; tipo: string; categoria: string | null; descricao: string | null; valor: number };
+type Movimento = { id: number; tipo: string; categoria: string | null; descricao: string | null; valor: number; forma_pagamento?: string };
 
 /** Linha de saque/despesa com editar (✏️) e remover (🗑️), quando o caixa está aberto. */
 export function LinhaMovimento({ m, podeEditar }: { m: Movimento; podeEditar: boolean }) {
@@ -218,6 +235,7 @@ export function LinhaMovimento({ m, podeEditar }: { m: Movimento; podeEditar: bo
   const [descricao, setDescricao] = useState(m.descricao ?? "");
   const [cat, setCat] = useState(m.categoria && CATEGORIAS_DESPESA.includes(m.categoria) ? m.categoria : (m.categoria ? "__outros__" : ""));
   const [outro, setOutro] = useState(m.categoria && !CATEGORIAS_DESPESA.includes(m.categoria) ? m.categoria : "");
+  const [forma, setForma] = useState(m.forma_pagamento ?? "dinheiro");
   const [msg, setMsg] = useState<Msg>(null);
   const [pending, start] = useTransition();
   const categoriaFinal = cat === "__outros__" ? outro.trim() : cat;
@@ -225,7 +243,7 @@ export function LinhaMovimento({ m, podeEditar }: { m: Movimento; podeEditar: bo
   function salvar() {
     start(async () => {
       const res = await editarMovimento({
-        id: m.id, valor: num(valorStr), descricao, categoria: categoriaFinal, tipo: m.tipo,
+        id: m.id, valor: num(valorStr), descricao, categoria: categoriaFinal, tipo: m.tipo, forma_pagamento: forma,
       });
       if (res.ok) { setEditando(false); setMsg(null); }
       else setMsg({ ok: false, txt: res.erro });
@@ -249,6 +267,9 @@ export function LinhaMovimento({ m, podeEditar }: { m: Movimento; podeEditar: bo
         ) : null}
         <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição"
           className={inp + " min-w-[8rem] flex-1 text-sm"} />
+        <select value={forma} onChange={(e) => setForma(e.target.value)} aria-label="Forma de pagamento" className={inp + " text-sm"}>
+          {FORMAS_PGTO.map((f) => <option key={f.v} value={f.v}>{f.label}</option>)}
+        </select>
         <input inputMode="decimal" value={valorStr} onChange={(e) => setValorStr(e.target.value)} aria-label="Valor"
           className={inp + " w-24 text-center text-sm font-bold"} />
         <button onClick={salvar} disabled={pending} className="rounded-full bg-marca-green px-3 py-1.5 text-xs font-bold text-white">
@@ -267,6 +288,11 @@ export function LinhaMovimento({ m, podeEditar }: { m: Movimento; podeEditar: bo
         {m.tipo === "saque" ? "Saque" : m.categoria ?? "Despesa"}
       </span>
       <span className="text-slate-600">{m.descricao}</span>
+      {(m.forma_pagamento ?? "dinheiro") !== "dinheiro" ? (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+          {FORMA_CURTA[m.forma_pagamento ?? "dinheiro"]}
+        </span>
+      ) : null}
       <span className={"ml-auto font-bold " + (m.tipo === "saque" ? "text-marca-green-dark" : "text-red-600")}>
         {m.tipo === "saque" ? "+" : "−"}{formatBRL(Number(m.valor))}
       </span>
