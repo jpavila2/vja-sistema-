@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
 import { calcTotalCompra, pesoLiquido } from "@/lib/compra";
-import { usePersistedState } from "@/lib/usePersistedState";
+import { useComandas } from "@/lib/useComandas";
+import { useFilaEnvio } from "@/lib/useFilaEnvio";
+import { type Comanda, type CompraPayload, rotuloComanda } from "@/lib/comandas";
 import { registrarCompra, criarCatador, precosDoCatador, salvarPrecosCatador } from "./actions";
+import { BarraComandas } from "./BarraComandas";
+import { IndicadorFila } from "./IndicadorFila";
 import { buscarCatadores, resolverCatador, type CatadorOpt } from "@/lib/catador";
 import type { Material, ItemCesta, Pessoa } from "@/lib/types";
 
@@ -13,41 +17,42 @@ type Props = {
   fornecedores: Pick<Pessoa, "id" | "nome">[];
   avulsoId: number | null;
 };
-type ModoCatador = "conhecido" | "novo" | "avulso";
 
 const r3 = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000;
 
 export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
-  // rascunho automático: a cesta fica salva no aparelho e volta se fechar/atualizar
-  const [cesta, setCesta] = usePersistedState<ItemCesta[]>("vja:balanca:cesta:v1", []);
+  // comandas (pesagens abertas) salvas no aparelho — rascunho que não se perde
+  const { comandas, ativa, ativaId, hidratado, selecionar, nova, encerrar, patchAtiva } = useComandas();
+  // fila de envio offline: finaliza sem internet e sobe sozinho quando voltar
+  const { pendentes, enfileirar } = useFilaEnvio((p) => registrarCompra(p));
+
+  // pesagem em andamento (modal) — estado local p/ teclado responsivo; é espelhado
+  // na comanda ativa (emAndamento) para sobreviver a recarga/troca de comanda
   const [sel, setSel] = useState<Material | null>(null);
   const [pesoStr, setPesoStr] = useState("0");
-  const [precoStr, setPrecoStr] = useState(""); // preço de compra editável (preço especial)
-  const [bags, setBags] = useState(0); // nº de big bags (cada bag desconta kgBag do bruto)
-  const [kgBagStr, setKgBagStr] = useState("3"); // kg descontado por bag (padrão 3)
-  const [bagsCustom, setBagsCustom] = useState(false); // campo "+mais" aberto
-  const [pct, setPct] = useState(0); // % de impureza
-  const [pctStr, setPctStr] = useState(""); // campo custom
-  const [modo, setModo] = useState<ModoCatador>("conhecido");
-  const [busca, setBusca] = useState("");
-  const [catadorSel, setCatadorSel] = useState<CatadorOpt | null>(null);
+  const [precoStr, setPrecoStr] = useState("");
+  const [bags, setBags] = useState(0);
+  const [kgBagStr, setKgBagStr] = useState("3");
+  const [bagsCustom, setBagsCustom] = useState(false);
+  const [pct, setPct] = useState(0);
+  const [pctStr, setPctStr] = useState("");
+
+  // UI efêmera (não persiste)
   const [mostrarSug, setMostrarSug] = useState(false);
-  const [novoNome, setNovoNome] = useState("");
-  const [novoTel, setNovoTel] = useState("");
-  const [msg, setMsg] = useState("");
   const [buscaMat, setBuscaMat] = useState("");
-  const [reqId, setReqId] = useState<string>(() => crypto.randomUUID());
-  const [pending, startTransition] = useTransition();
-  const [precosCatador, setPrecosCatador] = useState<Record<number, number>>({}); // preços próprios do catador
-  const [salvarPrecos, setSalvarPrecos] = useState(false); // checkbox "salvar preços deste catador"
-  const [salvandoCat, setSalvandoCat] = useState(false); // botão "Salvar catador" do cadastro rápido
+  const [msg, setMsg] = useState("");
+  const [pending, setPending] = useState(false);
+  const [salvandoCat, setSalvandoCat] = useState(false);
+  const [precosCatador, setPrecosCatador] = useState<Record<number, number>>({});
+
+  // campos da comanda ativa
+  const { modo, busca, catadorSel, novoNome, novoTel, salvarPrecos, cesta } = ativa;
 
   const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
   const materiaisFiltrados = buscaMat.trim()
     ? materiais.filter((m) => norm(m.nome).includes(norm(buscaMat)))
     : materiais;
 
-  // catador resolvido para exibir "Pagando para" e travar lançamento no errado
   const sugestoes = buscarCatadores(fornecedores, busca);
   const resol = resolverCatador(fornecedores, busca);
   const catadorEfetivo: CatadorOpt | null =
@@ -56,11 +61,44 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
 
   // carrega os preços próprios do catador quando ele muda
   useEffect(() => {
-    if (catadorId == null) { setPrecosCatador({}); setSalvarPrecos(false); return; }
+    if (catadorId == null) { setPrecosCatador({}); return; }
     let ativo = true;
     precosDoCatador(catadorId).then((m) => { if (ativo) setPrecosCatador(m); });
     return () => { ativo = false; };
   }, [catadorId]);
+
+  // ── sincroniza modal <-> comanda ativa ───────────────────────────────────
+  const modalDaComanda = useRef<string | null>(null);
+  const pulaPersist = useRef(false);
+  // ao trocar de comanda (ou hidratar): carrega a pesagem em andamento dela
+  useEffect(() => {
+    if (!hidratado) return;
+    if (modalDaComanda.current === ativaId) return;
+    modalDaComanda.current = ativaId;
+    pulaPersist.current = true;
+    const ea = ativa.emAndamento;
+    if (ea) {
+      setSel(materiais.find((m) => m.id === ea.material_id) ?? null);
+      setPesoStr(ea.pesoStr); setPrecoStr(ea.precoStr);
+      setBags(ea.bags); setBagsCustom(ea.bagsCustom);
+      setKgBagStr(ea.kgBagStr); setPct(ea.pct); setPctStr(ea.pctStr);
+    } else {
+      setSel(null); setPesoStr("0"); setPrecoStr(""); setBags(0);
+      setBagsCustom(false); setKgBagStr("3"); setPct(0); setPctStr("");
+    }
+    setMostrarSug(false); setMsg("");
+  }, [ativaId, hidratado, ativa, materiais]);
+  // espelha a pesagem em andamento na comanda (sobrevive a recarga no meio)
+  useEffect(() => {
+    if (!hidratado) return;
+    if (modalDaComanda.current !== ativaId) return;
+    if (pulaPersist.current) { pulaPersist.current = false; return; }
+    patchAtiva({
+      emAndamento: sel
+        ? { material_id: sel.id, pesoStr, precoStr, bags, bagsCustom, kgBagStr, pct, pctStr }
+        : null,
+    });
+  }, [sel, pesoStr, precoStr, bags, bagsCustom, kgBagStr, pct, pctStr, hidratado, ativaId, patchAtiva]);
 
   const peso = parseFloat(pesoStr.replace(",", ".")) || 0;
   const kgBag = parseFloat(kgBagStr.replace(",", ".")) || 0;
@@ -73,7 +111,6 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   function abrir(m: Material) {
     setSel(m); setPesoStr("0"); setPct(0); setPctStr("");
     setBags(0); setKgBagStr("3"); setBagsCustom(false);
-    // preço do catador (se tiver) tem prioridade sobre o preço de tabela
     const precoBase = precosCatador[m.id] ?? m.preco_compra;
     setPrecoStr(precoBase > 0 ? String(precoBase) : "");
   }
@@ -91,28 +128,35 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
     const n = parseFloat(v.replace(",", "."));
     setPct(Number.isFinite(n) && n >= 0 && n <= 100 ? n : 0);
   }
+  function fecharModal() {
+    setSel(null); setPesoStr("0"); setPct(0); setPctStr("");
+    setBags(0); setKgBagStr("3"); setBagsCustom(false); setPrecoStr("");
+  }
   function adicionar() {
     if (!sel || liquido <= 0) { setMsg("Digite o peso"); return; }
     if (precoEdit < 0) { setMsg("Preço inválido"); return; }
-    setCesta((c) => [...c, {
+    const item: ItemCesta = {
       material_id: sel.id, nome: sel.nome, emoji: sel.emoji, unidade: sel.unidade,
       preco_unitario: precoEdit, peso_bruto: peso, peso_liquido: liquido,
       subtotal: calcSubtotal(liquido, precoEdit),
-    }]);
-    setSel(null); setMsg("");
+    };
+    patchAtiva({ cesta: [...cesta, item], emAndamento: null });
+    fecharModal(); setMsg("");
   }
-  function remover(i: number) { setCesta((c) => c.filter((_, idx) => idx !== i)); }
+  function remover(i: number) { patchAtiva({ cesta: cesta.filter((_, idx) => idx !== i) }); }
 
-  function obterCatadorPayload(): { pessoa_id: number | null; nome: string; tel: string } | null {
-    if (modo === "avulso") {
+  function obterCatadorPayload(c: Comanda): { pessoa_id: number | null; nome: string; tel: string } | null {
+    if (c.modo === "avulso") {
       if (avulsoId) return { pessoa_id: avulsoId, nome: "", tel: "" };
       return { pessoa_id: null, nome: "Avulso", tel: "" };
     }
-    if (modo === "novo") {
-      if (novoNome.trim() === "") return null;
-      return { pessoa_id: null, nome: novoNome.trim(), tel: novoTel.trim() };
+    if (c.modo === "novo") {
+      if (c.novoNome.trim() === "") return null;
+      return { pessoa_id: null, nome: c.novoNome.trim(), tel: c.novoTel.trim() };
     }
-    if (catadorEfetivo) return { pessoa_id: catadorEfetivo.id, nome: "", tel: "" };
+    const r = resolverCatador(fornecedores, c.busca);
+    const efetivo = c.catadorSel ?? (r.tipo === "ok" ? { id: r.id, nome: r.nome } : null);
+    if (efetivo) return { pessoa_id: efetivo.id, nome: "", tel: "" };
     return null;
   }
 
@@ -122,58 +166,64 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
     return "Toque no nome do catador na lista ou use o + para cadastrar";
   }
 
-  // cadastra o catador na hora (cadastro rápido) e já o seleciona como conhecido
   function salvarCatadorNovo() {
     if (salvandoCat) return;
     if (novoNome.trim() === "") { setMsg("Digite o nome do catador"); return; }
     setSalvandoCat(true);
-    startTransition(async () => {
+    (async () => {
       const res = await criarCatador(novoNome, novoTel);
       setSalvandoCat(false);
       if (res.ok) {
-        setCatadorSel({ id: res.id, nome: res.nome });
-        setBusca(res.nome); setNovoNome(""); setNovoTel("");
-        setModo("conhecido"); setMostrarSug(false);
+        patchAtiva({ catadorSel: { id: res.id, nome: res.nome }, busca: res.nome, novoNome: "", novoTel: "", modo: "conhecido" });
+        setMostrarSug(false);
         setMsg(`✅ Catador "${res.nome}" cadastrado`);
       } else setMsg("Erro ao cadastrar catador: " + res.erro);
-    });
+    })();
   }
 
-  // preços usados nesta compra, um por material (último valor vence)
-  function precosDaCesta(): { material_id: number; preco: number | null }[] {
+  function precosDaCesta(c: Comanda): { material_id: number; preco: number | null }[] {
     const mapa = new Map<number, number>();
-    cesta.forEach((i) => mapa.set(i.material_id, i.preco_unitario));
+    c.cesta.forEach((i) => mapa.set(i.material_id, i.preco_unitario));
     return Array.from(mapa, ([material_id, preco]) => ({ material_id, preco }));
   }
 
   function finalizar() {
-    if (pending) return; // trava duplo-clique
-    if (cesta.length === 0) return;
-    const cat = obterCatadorPayload();
+    if (pending) return;
+    const c = ativa;
+    if (c.cesta.length === 0) return;
+    const cat = obterCatadorPayload(c);
     if (!cat) { setMsg(msgCatador()); return; }
-    startTransition(async () => {
+    const totalC = calcTotalCompra(c.cesta);
+    const payload: CompraPayload = {
+      pessoa_id: cat.pessoa_id, catador_nome: cat.nome, catador_telefone: cat.tel,
+      observacoes: "",
+      itens: c.cesta.map((i) => ({ material_id: i.material_id, peso_bruto: i.peso_bruto, peso_liquido: i.peso_liquido, preco_unitario: i.preco_unitario })),
+      client_request_id: c.client_request_id,
+    };
+    const querPrecos = salvarPrecos && cat.pessoa_id != null;
+    const precos = precosDaCesta(c);
+    setPending(true);
+    (async () => {
       try {
-        const res = await registrarCompra({
-          pessoa_id: cat.pessoa_id, catador_nome: cat.nome, catador_telefone: cat.tel,
-          observacoes: "",
-          itens: cesta.map((i) => ({ material_id: i.material_id, peso_bruto: i.peso_bruto, peso_liquido: i.peso_liquido, preco_unitario: i.preco_unitario })),
-          client_request_id: reqId,
-        });
+        const res = await registrarCompra(payload);
         if (res.ok) {
-          // salva os preços desta compra como preços fixos do catador, se marcado
-          if (salvarPrecos && cat.pessoa_id != null) {
-            await salvarPrecosCatador(cat.pessoa_id, precosDaCesta());
+          if (querPrecos && cat.pessoa_id != null) {
+            try { await salvarPrecosCatador(cat.pessoa_id, precos); } catch { /* preço é secundário */ }
           }
-          setMsg(`✅ Compra salva — ${formatBRL(total)}`);
-          setCesta([]); setNovoNome(""); setNovoTel(""); setBusca("");
-          setCatadorSel(null); setMostrarSug(false); setModo("conhecido");
-          setSalvarPrecos(false); setPrecosCatador({});
-          setReqId(crypto.randomUUID()); // nova chave para a próxima compra
-        } else setMsg("Erro: " + res.erro);
-      } catch (e) {
-        setMsg("Erro ao salvar — tente de novo. " + (e instanceof Error ? e.message : ""));
+          setMsg(`✅ Compra salva — ${formatBRL(totalC)}`);
+          encerrar(c.id);
+        } else {
+          setMsg("Erro: " + res.erro); // erro de negócio: não enfileira
+        }
+      } catch {
+        // sem internet / falha de transporte: guarda na fila e segue trabalhando
+        enfileirar(payload);
+        setMsg(`📤 Sem internet — compra de ${formatBRL(totalC)} guardada. Sobe sozinho quando voltar.`);
+        encerrar(c.id);
+      } finally {
+        setPending(false);
       }
-    });
+    })();
   }
 
   const btn = "rounded-xl text-xl font-extrabold active:scale-95 transition-transform";
@@ -181,14 +231,22 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const bagBtn = (on: boolean) => "rounded-xl px-5 py-3 text-xl font-black active:scale-95 " + (on ? "bg-marca-teal text-white" : "bg-slate-100 text-slate-700");
   const pctBtn = (on: boolean) => "rounded-lg px-3 py-1.5 text-sm font-bold " + (on ? "bg-marca-teal text-white" : "bg-slate-100 text-slate-600");
 
+  if (!hidratado) {
+    return <div className="p-8 text-center text-slate-400">Carregando…</div>;
+  }
+
   return (
     <div className={"space-y-4 " + (cesta.length > 0 ? "pb-40" : "")}>
+      {/* barra de pesagens abertas (comandas) + fila offline */}
+      <BarraComandas comandas={comandas} ativaId={ativaId} onSelecionar={selecionar} onNova={nova} />
+      <IndicadorFila pendentes={pendentes} />
+
       {/* catador */}
       <div className="rounded-2xl border bg-white p-3">
         <div className="mb-2 flex gap-2">
-          <button onClick={() => setModo("conhecido")} className={tab(modo === "conhecido")}>Cadastrado</button>
-          <button onClick={() => setModo("novo")} className={tab(modo === "novo")}>Cadastro rápido</button>
-          <button onClick={() => setModo("avulso")} className={tab(modo === "avulso")}>Avulso</button>
+          <button onClick={() => patchAtiva({ modo: "conhecido" })} className={tab(modo === "conhecido")}>Cadastrado</button>
+          <button onClick={() => patchAtiva({ modo: "novo" })} className={tab(modo === "novo")}>Cadastro rápido</button>
+          <button onClick={() => patchAtiva({ modo: "avulso" })} className={tab(modo === "avulso")}>Avulso</button>
         </div>
         {modo === "conhecido" ? (
           <div className="relative">
@@ -196,14 +254,14 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
               <input
                 aria-label="Buscar catador"
                 value={busca}
-                onChange={(e) => { setBusca(e.target.value); setCatadorSel(null); setMostrarSug(true); }}
+                onChange={(e) => { patchAtiva({ busca: e.target.value, catadorSel: null }); setMostrarSug(true); }}
                 onFocus={() => setMostrarSug(true)}
                 placeholder="Digite para encontrar o catador…"
                 className="min-w-0 flex-1 rounded-xl border p-3 text-base"
               />
               <button
                 type="button"
-                onClick={() => { setNovoNome(busca.trim()); setMostrarSug(false); setModo("novo"); }}
+                onClick={() => { patchAtiva({ novoNome: busca.trim(), modo: "novo" }); setMostrarSug(false); }}
                 title="Cadastrar novo catador"
                 aria-label="Cadastrar novo catador"
                 className="shrink-0 rounded-xl bg-marca-teal px-5 text-2xl font-black text-white active:scale-95">
@@ -216,7 +274,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
                   <li key={s.id}>
                     <button
                       type="button"
-                      onClick={() => { setCatadorSel(s); setBusca(s.nome); setMostrarSug(false); }}
+                      onClick={() => { patchAtiva({ catadorSel: s, busca: s.nome }); setMostrarSug(false); }}
                       className="block w-full px-4 py-3 text-left text-base hover:bg-marca-teal-light">
                       {s.nome}
                     </button>
@@ -242,16 +300,16 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
         ) : modo === "novo" ? (
           <div>
             <div className="flex flex-wrap gap-2">
-              <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome do catador"
+              <input value={novoNome} onChange={(e) => patchAtiva({ novoNome: e.target.value })} placeholder="Nome do catador"
                 className="min-w-[12rem] flex-1 rounded-xl border p-3 text-base" />
-              <input value={novoTel} onChange={(e) => setNovoTel(e.target.value)} placeholder="Telefone (opcional)"
+              <input value={novoTel} onChange={(e) => patchAtiva({ novoTel: e.target.value })} placeholder="Telefone (opcional)"
                 className="min-w-[10rem] flex-1 rounded-xl border p-3 text-base" />
               <button type="button" onClick={salvarCatadorNovo} disabled={salvandoCat || novoNome.trim() === ""}
                 className="shrink-0 rounded-xl bg-marca-green px-5 py-3 text-base font-black text-white active:scale-95 disabled:bg-slate-300">
                 {salvandoCat ? "Salvando…" : "Salvar"}
               </button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">💡 Salve o catador agora pra já usar e guardar os preços dele.</p>
+            <p className="mt-2 text-xs text-slate-500">💡 Salve o catador agora pra já usar e guardar os preços dele. (Sem internet, deixe no “Cadastro rápido” — sobe junto da compra.)</p>
           </div>
         ) : (
           <p className="text-sm text-slate-500">Compra avulsa (catador não cadastrado).</p>
@@ -300,7 +358,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
 
       {/* cesta */}
       <div className="rounded-2xl border bg-white">
-        <div className="border-b bg-slate-50 p-3 font-bold">Itens desta compra</div>
+        <div className="border-b bg-slate-50 p-3 font-bold">Itens desta compra — {rotuloComanda(ativa)}</div>
         {cesta.length === 0 ? (
           <div className="p-6 text-center text-slate-400">Nenhum item ainda.</div>
         ) : cesta.map((it, i) => (
@@ -326,13 +384,13 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
 
       {msg ? <p className="text-center text-lg font-bold">{msg}</p> : null}
 
-      {/* barra fixa: TOTAL + finalizar sempre na tela (não precisa rolar a lista) */}
+      {/* barra fixa: TOTAL + finalizar sempre na tela */}
       {cesta.length > 0 && !sel ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 shadow-[0_-4px_16px_rgba(0,0,0,0.10)] backdrop-blur">
           <div className="mx-auto max-w-5xl space-y-2 px-4 py-3">
             {catadorId != null ? (
               <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600">
-                <input type="checkbox" checked={salvarPrecos} onChange={(e) => setSalvarPrecos(e.target.checked)}
+                <input type="checkbox" checked={salvarPrecos} onChange={(e) => patchAtiva({ salvarPrecos: e.target.checked })}
                   className="h-5 w-5 accent-marca-teal" />
                 💾 Salvar estes preços para {catadorEfetivo?.nome} (vira o preço fixo dele)
               </label>
@@ -355,7 +413,6 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
       {sel ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
           <div className="flex max-h-[100dvh] w-full max-w-2xl flex-col rounded-t-3xl bg-white">
-            {/* readout fixo: material + peso digitado + valor somando (sempre visível) */}
             <div className="shrink-0 border-b px-4 pb-3 pt-3">
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-2xl">{sel.emoji}</span>
@@ -374,9 +431,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
               </div>
             </div>
 
-            {/* controles roláveis: preço + bags + impureza (encolhem em telas baixas) */}
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-2">
-              {/* preço de compra editável (preço especial pro catador) */}
               <div className="flex items-center gap-2">
                 <label className="text-sm font-bold text-slate-600">Preço (R$/{sel.unidade}):</label>
                 <input
@@ -394,7 +449,6 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
                   </button>
                 ) : null}
               </div>
-              {/* desconto por bag (big bag) — em destaque */}
               <div className="rounded-xl border-2 border-marca-teal-light bg-marca-teal-light/30 p-2.5">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-base font-extrabold text-marca-teal-dark">🛍️ Bags</span>
@@ -434,7 +488,6 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
                   </div>
                 </div>
               </div>
-              {/* impureza % — secundário, menor, embaixo */}
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs font-bold text-slate-400">Impureza:</span>
                 <button onClick={() => escolherPct(0)} className={pctBtn(pct === 0 && pctStr === "")}>0%</button>
@@ -445,7 +498,6 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
               </div>
             </div>
 
-            {/* teclado + ações fixos embaixo (sempre tocáveis) */}
             <div className="shrink-0 border-t px-4 pb-4 pt-2">
               <div className="grid grid-cols-3 gap-2">
                 {["7","8","9","4","5","6","1","2","3",",","0","back"].map((k) => (
@@ -455,7 +507,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
                 ))}
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2">
-                <button onClick={() => setSel(null)} className={`${btn} bg-slate-200 p-3 text-lg`}>Cancelar</button>
+                <button onClick={fecharModal} className={`${btn} bg-slate-200 p-3 text-lg`}>Cancelar</button>
                 <button onClick={adicionar} className={`${btn} col-span-2 bg-marca-green p-3 text-xl text-white`}>✅ Adicionar item</button>
               </div>
             </div>
