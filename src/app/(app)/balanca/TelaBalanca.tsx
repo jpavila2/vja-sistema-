@@ -5,10 +5,12 @@ import { formatBRL, calcSubtotal } from "@/lib/format";
 import { calcTotalCompra, pesoLiquido } from "@/lib/compra";
 import { useComandas } from "@/lib/useComandas";
 import { useFilaEnvio } from "@/lib/useFilaEnvio";
+import { useRecibos } from "@/lib/useRecibos";
 import { type Comanda, type CompraPayload, rotuloComanda } from "@/lib/comandas";
 import { registrarCompra, criarCatador, precosDoCatador, salvarPrecosCatador } from "./actions";
 import { BarraComandas } from "./BarraComandas";
 import { IndicadorFila } from "./IndicadorFila";
+import { UltimasCompras } from "./UltimasCompras";
 import { buscarCatadores, resolverCatador, type CatadorOpt } from "@/lib/catador";
 import type { Material, ItemCesta, Pessoa } from "@/lib/types";
 
@@ -25,6 +27,8 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const { comandas, ativa, ativaId, hidratado, selecionar, nova, encerrar, patchAtiva } = useComandas();
   // fila de envio offline: finaliza sem internet e sobe sozinho quando voltar
   const { pendentes, enfileirar } = useFilaEnvio((p) => registrarCompra(p));
+  // histórico local das últimas compras deste aparelho
+  const { recibos, adicionar: addRecibo } = useRecibos();
 
   // pesagem em andamento (modal) — estado local p/ teclado responsivo; é espelhado
   // na comanda ativa (emAndamento) para sobreviver a recarga/troca de comanda
@@ -44,6 +48,8 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const [pending, setPending] = useState(false);
   const [salvandoCat, setSalvandoCat] = useState(false);
   const [precosCatador, setPrecosCatador] = useState<Record<number, number>>({});
+  const [verCatador, setVerCatador] = useState(false); // área do catador recolhida por padrão
+  const [verCesta, setVerCesta] = useState(false); // painel de itens (na barra de baixo)
 
   // campos da comanda ativa
   const { modo, busca, catadorSel, novoNome, novoTel, salvarPrecos, cesta } = ativa;
@@ -202,6 +208,16 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
     };
     const querPrecos = salvarPrecos && cat.pessoa_id != null;
     const precos = precosDaCesta(c);
+    const reciboBase = {
+      id: c.client_request_id,
+      quando: Date.now(),
+      catador: rotuloComanda(c),
+      itens: c.cesta.map((i) => ({
+        nome: i.nome, emoji: i.emoji, unidade: i.unidade,
+        peso: i.peso_liquido, preco: i.preco_unitario, subtotal: i.subtotal,
+      })),
+      total: totalC,
+    };
     setPending(true);
     (async () => {
       try {
@@ -210,6 +226,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
           if (querPrecos && cat.pessoa_id != null) {
             try { await salvarPrecosCatador(cat.pessoa_id, precos); } catch { /* preço é secundário */ }
           }
+          addRecibo({ ...reciboBase, status: "enviado" });
           setMsg(`✅ Compra salva — ${formatBRL(totalC)}`);
           encerrar(c.id);
         } else {
@@ -218,6 +235,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
       } catch {
         // sem internet / falha de transporte: guarda na fila e segue trabalhando
         enfileirar(payload);
+        addRecibo({ ...reciboBase, status: "fila" });
         setMsg(`📤 Sem internet — compra de ${formatBRL(totalC)} guardada. Sobe sozinho quando voltar.`);
         encerrar(c.id);
       } finally {
@@ -236,28 +254,42 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   }
 
   return (
-    <div className={"space-y-4 " + (cesta.length > 0 ? "pb-40" : "")}>
-      {/* barra de pesagens abertas (comandas) + fila offline */}
-      <BarraComandas
-        comandas={comandas}
-        ativaId={ativaId}
-        onSelecionar={selecionar}
-        onNova={nova}
-        onExcluir={(id) => {
-          const c = comandas.find((x) => x.id === id);
-          if (c && c.cesta.length > 0 && !confirm(`Excluir a pesagem de ${rotuloComanda(c)} com ${c.cesta.length} item(ns)? Não dá pra desfazer.`)) return;
-          if (id === ativaId) fecharModal();
-          encerrar(id);
-        }}
-      />
+    <div className={"space-y-3 " + (cesta.length > 0 ? "pb-40" : "")}>
+      {/* barra de pesagens abertas (comandas) + últimas compras */}
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <BarraComandas
+            comandas={comandas}
+            ativaId={ativaId}
+            onSelecionar={selecionar}
+            onNova={nova}
+            onExcluir={(id) => {
+              const c = comandas.find((x) => x.id === id);
+              if (c && c.cesta.length > 0 && !confirm(`Excluir a pesagem de ${rotuloComanda(c)} com ${c.cesta.length} item(ns)? Não dá pra desfazer.`)) return;
+              if (id === ativaId) fecharModal();
+              encerrar(id);
+            }}
+          />
+        </div>
+        <UltimasCompras recibos={recibos} />
+      </div>
       <IndicadorFila pendentes={pendentes} />
 
-      {/* catador */}
+      {/* catador — recolhido por padrão (começa Avulso) pra sobrar espaço */}
+      {!verCatador ? (
+        <button onClick={() => setVerCatador(true)}
+          className="flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2 text-left text-sm">
+          <span className="font-bold text-slate-500">Cliente:</span>
+          <span className="font-extrabold text-marca-navy">{rotuloComanda(ativa)}</span>
+          <span className="ml-auto font-bold text-marca-teal-dark">identificar / trocar ▾</span>
+        </button>
+      ) : (
       <div className="rounded-2xl border bg-white p-3">
-        <div className="mb-2 flex gap-2">
+        <div className="mb-2 flex items-center gap-2">
           <button onClick={() => patchAtiva({ modo: "conhecido" })} className={tab(modo === "conhecido")}>Cadastrado</button>
           <button onClick={() => patchAtiva({ modo: "novo" })} className={tab(modo === "novo")}>Cadastro rápido</button>
           <button onClick={() => patchAtiva({ modo: "avulso" })} className={tab(modo === "avulso")}>Avulso</button>
+          <button onClick={() => setVerCatador(false)} className="ml-auto rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-500">▴ recolher</button>
         </div>
         {modo === "conhecido" ? (
           <div className="relative">
@@ -326,6 +358,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
           <p className="text-sm text-slate-500">Compra avulsa (catador não cadastrado).</p>
         )}
       </div>
+      )}
 
       {/* grade */}
       <div>
@@ -354,51 +387,55 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
             Nenhum material com “{buscaMat}”.
           </div>
         ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
+        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5">
           {materiaisFiltrados.map((m) => (
             <button key={m.id} onClick={() => abrir(m)}
-              className={`${btn} flex min-h-[84px] flex-col items-center justify-center gap-0.5 border-2 bg-white p-2 shadow-sm`}>
-              <span className="text-2xl leading-none">{m.emoji}</span>
-              <span className="text-sm leading-tight">{m.nome}</span>
-              <span className="text-xs font-bold text-marca-teal-dark">{formatBRL(m.preco_compra)}/{m.unidade}</span>
+              className={`${btn} flex min-h-[104px] flex-col items-center justify-center gap-1 border-2 bg-white p-3 shadow-sm`}>
+              <span className="text-3xl leading-none">{m.emoji}</span>
+              <span className="text-base leading-tight">{m.nome}</span>
+              <span className="text-sm font-bold text-marca-teal-dark">{formatBRL(m.preco_compra)}/{m.unidade}</span>
             </button>
           ))}
         </div>
         )}
       </div>
 
-      {/* cesta */}
-      <div className="rounded-2xl border bg-white">
-        <div className="border-b bg-slate-50 p-3 font-bold">Itens desta compra — {rotuloComanda(ativa)}</div>
-        {cesta.length === 0 ? (
-          <div className="p-6 text-center text-slate-400">Nenhum item ainda.</div>
-        ) : cesta.map((it, i) => (
-          <div key={i} className="flex items-center gap-3 border-b p-3 last:border-0">
-            <span className="text-2xl">{it.emoji}</span>
-            <div className="flex-1">
-              <div className="font-bold">{it.nome}</div>
-              <div className="text-sm text-slate-500">
-                {it.peso_liquido.toLocaleString("pt-BR")} {it.unidade} × {formatBRL(it.preco_unitario)}
-                {it.peso_liquido !== it.peso_bruto ? ` (bruto ${it.peso_bruto.toLocaleString("pt-BR")})` : ""}
-              </div>
-            </div>
-            <span className="font-extrabold">{formatBRL(it.subtotal)}</span>
-            <button onClick={() => remover(i)} className="rounded-lg bg-red-50 px-3 py-2 text-red-600">🗑️</button>
-          </div>
-        ))}
-        {cesta.length > 0 ? (
-          <div className="flex items-center justify-between rounded-b-2xl border-t p-4 text-xl font-black">
-            <span className="text-slate-500">TOTAL</span><span className="text-marca-teal-dark">{formatBRL(total)}</span>
-          </div>
-        ) : null}
-      </div>
+      {cesta.length === 0 ? (
+        <div className="rounded-2xl border bg-white p-6 text-center text-slate-400">
+          Nenhum item ainda. Toque num material acima para pesar.
+        </div>
+      ) : null}
 
       {msg ? <p className="text-center text-lg font-bold">{msg}</p> : null}
 
-      {/* barra fixa: TOTAL + finalizar sempre na tela */}
+      {/* barra fixa: itens (expansível) + TOTAL + finalizar sempre na tela */}
       {cesta.length > 0 && !sel ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 shadow-[0_-4px_16px_rgba(0,0,0,0.10)] backdrop-blur">
           <div className="mx-auto max-w-5xl space-y-2 px-4 py-3">
+            {/* itens da compra — visíveis sem rolar a página */}
+            <button onClick={() => setVerCesta((v) => !v)}
+              className="flex w-full items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">
+              🧾 Itens de {rotuloComanda(ativa)} ({cesta.length})
+              <span className="ml-auto text-marca-teal-dark">{verCesta ? "esconder ▾" : "ver itens ▴"}</span>
+            </button>
+            {verCesta ? (
+              <div className="max-h-56 overflow-y-auto rounded-xl border">
+                {cesta.map((it, i) => (
+                  <div key={i} className="flex items-center gap-3 border-b p-2.5 last:border-0">
+                    <span className="text-xl">{it.emoji}</span>
+                    <div className="flex-1">
+                      <div className="font-bold leading-tight">{it.nome}</div>
+                      <div className="text-xs text-slate-500">
+                        {it.peso_liquido.toLocaleString("pt-BR")} {it.unidade} × {formatBRL(it.preco_unitario)}
+                        {it.peso_liquido !== it.peso_bruto ? ` (bruto ${it.peso_bruto.toLocaleString("pt-BR")})` : ""}
+                      </div>
+                    </div>
+                    <span className="font-extrabold">{formatBRL(it.subtotal)}</span>
+                    <button onClick={() => remover(i)} aria-label={`Remover ${it.nome}`} className="rounded-lg bg-red-50 px-3 py-1.5 text-red-600">🗑️</button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {catadorId != null ? (
               <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600">
                 <input type="checkbox" checked={salvarPrecos} onChange={(e) => patchAtiva({ salvarPrecos: e.target.checked })}
