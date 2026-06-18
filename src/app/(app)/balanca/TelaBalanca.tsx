@@ -354,13 +354,13 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
             Nenhum material com “{buscaMat}”.
           </div>
         ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
           {materiaisFiltrados.map((m) => (
             <button key={m.id} onClick={() => abrir(m)}
-              className={`${btn} flex min-h-[110px] flex-col items-center justify-center gap-1 border-2 bg-white p-3 shadow-sm`}>
-              <span className="text-3xl">{m.emoji}</span>
-              <span className="text-lg">{m.nome}</span>
-              <span className="text-sm font-bold text-marca-teal-dark">{formatBRL(m.preco_compra)}/{m.unidade}</span>
+              className={`${btn} flex min-h-[84px] flex-col items-center justify-center gap-0.5 border-2 bg-white p-2 shadow-sm`}>
+              <span className="text-2xl leading-none">{m.emoji}</span>
+              <span className="text-sm leading-tight">{m.nome}</span>
+              <span className="text-xs font-bold text-marca-teal-dark">{formatBRL(m.preco_compra)}/{m.unidade}</span>
             </button>
           ))}
         </div>

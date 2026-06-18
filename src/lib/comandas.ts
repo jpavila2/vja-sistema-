@@ -40,7 +40,7 @@ export function novaComanda(): Comanda {
     client_request_id: crypto.randomUUID(),
     criadaEm: Date.now(),
     cesta: [],
-    modo: "conhecido",
+    modo: "avulso",
     catadorSel: null,
     busca: "",
     novoNome: "",
