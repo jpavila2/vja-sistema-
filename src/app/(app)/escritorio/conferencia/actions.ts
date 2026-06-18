@@ -44,6 +44,18 @@ export async function editarCompra(input: {
   revalidatePath("/escritorio/materiais");
 }
 
+export async function trocarFornecedorCompra(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const pessoa_id = Number(formData.get("pessoa_id"));
+  if (!id || !pessoa_id) throw new Error("Selecione um vendedor.");
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { error } = await supabase.from("purchases").update({ pessoa_id }).eq("id", id);
+  if (error) throw new Error("Não foi possível trocar o vendedor: " + error.message);
+  revalidatePath("/escritorio/conferencia");
+  revalidatePath("/escritorio/historico");
+  revalidatePath("/");
+}
+
 export async function alterarDataCompra(formData: FormData) {
   const id = Number(formData.get("id"));
   const data = String(formData.get("data") ?? ""); // yyyy-mm-dd

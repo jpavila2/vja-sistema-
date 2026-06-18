@@ -3,7 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
-import { conferirCompra, cancelarCompra, editarCompra, excluirCompra, alterarDataCompra } from "./actions";
+import { conferirCompra, cancelarCompra, editarCompra, excluirCompra, alterarDataCompra, trocarFornecedorCompra } from "./actions";
+import { buscarCatadores } from "@/lib/catador";
 
 // yyyy-mm-dd no fuso de São Paulo (para o <input type="date">)
 const dataSP = (iso: string) =>
@@ -48,7 +49,9 @@ type LinhaEdit = {
 
 const num = (s: string) => parseFloat(s.replace(",", ".")) || 0;
 
-export function CardCompra({ compra: c, materiais }: { compra: Compra; materiais: MaterialOpt[] }) {
+type Fornecedor = { id: number; nome: string };
+
+export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Compra; materiais: MaterialOpt[]; fornecedores: Fornecedor[] }) {
   const [editando, setEditando] = useState(false);
   const [linhas, setLinhas] = useState<LinhaEdit[]>([]);
   const [forma, setForma] = useState(c.forma_pagamento === "pix" ? "pix" : "dinheiro");
@@ -238,6 +241,10 @@ export function CardCompra({ compra: c, materiais }: { compra: Compra; materiais
         ) : null}
 
         {c.status !== "cancelada" ? (
+          <EditorFornecedor compraId={c.id} fornecedores={fornecedores} />
+        ) : null}
+
+        {c.status !== "cancelada" ? (
           <form action={alterarDataCompra} className="flex items-center gap-1">
             <input type="hidden" name="id" value={c.id} />
             <label className="text-xs font-bold text-slate-500">📅 Data</label>
@@ -271,5 +278,59 @@ export function CardCompra({ compra: c, materiais }: { compra: Compra; materiais
         </BotaoConfirmar>
       </div>
     </div>
+  );
+}
+
+/** Combobox para trocar o vendedor (fornecedor) de uma compra na conferência. */
+function EditorFornecedor({ compraId, fornecedores }: { compraId: number; fornecedores: { id: number; nome: string }[] }) {
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [sel, setSel] = useState<{ id: number; nome: string } | null>(null);
+  const sug = buscarCatadores(fornecedores, busca);
+
+  if (!aberto) {
+    return (
+      <button type="button" onClick={() => setAberto(true)}
+        className="rounded-full border px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+        👤 Trocar vendedor
+      </button>
+    );
+  }
+  return (
+    <form action={trocarFornecedorCompra} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={compraId} />
+      <input type="hidden" name="pessoa_id" value={sel?.id ?? ""} />
+      <div className="relative">
+        <input
+          autoFocus
+          aria-label="Buscar vendedor"
+          value={busca}
+          onChange={(e) => { setBusca(e.target.value); setSel(null); }}
+          placeholder="Digite o vendedor…"
+          className="w-48 rounded-lg border p-2 text-sm"
+        />
+        {!sel && busca.trim() && sug.length > 0 && (
+          <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-lg border bg-white shadow-lg">
+            {sug.map((s) => (
+              <li key={s.id}>
+                <button type="button"
+                  onClick={() => { setSel(s); setBusca(s.nome); }}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-marca-teal-light">
+                  {s.nome}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <button type="submit" disabled={!sel}
+        className="rounded-lg bg-marca-teal px-3 py-1.5 text-xs font-bold text-white disabled:bg-slate-300">
+        Salvar
+      </button>
+      <button type="button" onClick={() => { setAberto(false); setBusca(""); setSel(null); }}
+        className="rounded-lg border px-3 py-1.5 text-xs font-semibold text-slate-500">
+        Cancelar
+      </button>
+    </form>
   );
 }
