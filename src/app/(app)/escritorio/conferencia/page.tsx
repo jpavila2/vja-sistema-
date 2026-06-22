@@ -11,7 +11,7 @@ export default async function ConferenciaPage({ searchParams }: { searchParams: 
   const [{ data }, { data: materiais }, { data: fornecedoresData }] = await Promise.all([
     supabase
       .from("purchases")
-      .select("id, total, status, forma_pagamento, data_hora, observacoes, people(nome), purchase_items(id, material_id, peso_bruto, peso_liquido, preco_unitario, subtotal, materials(nome, emoji, unidade))")
+      .select("id, total, status, forma_pagamento, data_hora, observacoes, pessoa_id, people(nome), purchase_items(id, material_id, peso_bruto, peso_liquido, preco_unitario, subtotal, materials(nome, emoji, unidade))")
       .gte("data_hora", inicio).lt("data_hora", fim)
       .order("data_hora", { ascending: false }),
     supabase.from("materials").select("id, nome, emoji, unidade, preco_compra").eq("ativo", true).order("nome"),

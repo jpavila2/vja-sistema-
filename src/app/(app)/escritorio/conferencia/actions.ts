@@ -44,6 +44,22 @@ export async function editarCompra(input: {
   revalidatePath("/escritorio/materiais");
 }
 
+/** Salva/atualiza os preços de compra próprios deste cliente (catador/fornecedor).
+ *  preco null => volta ao preço de tabela. Mesmo mecanismo da balança. */
+export async function salvarPrecosCliente(
+  pessoaId: number,
+  precos: { material_id: number; preco: number | null }[],
+) {
+  if (!pessoaId) throw new Error("Compra sem cliente cadastrado — não dá para salvar preços.");
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { error } = await supabase.rpc("salvar_precos_catador", {
+    p_pessoa_id: pessoaId,
+    p_precos: precos,
+  });
+  if (error) throw new Error("Não foi possível salvar os preços do cliente: " + error.message);
+  revalidatePath("/balanca");
+}
+
 export async function trocarFornecedorCompra(formData: FormData) {
   const id = Number(formData.get("id"));
   const pessoa_id = Number(formData.get("pessoa_id"));

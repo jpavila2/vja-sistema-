@@ -48,7 +48,6 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
   const [pending, setPending] = useState(false);
   const [salvandoCat, setSalvandoCat] = useState(false);
   const [precosCatador, setPrecosCatador] = useState<Record<number, number>>({});
-  const [verCatador, setVerCatador] = useState(false); // área do catador recolhida por padrão
   const [verCesta, setVerCesta] = useState(false); // painel de itens (na barra de baixo)
 
   // campos da comanda ativa
@@ -150,6 +149,27 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
     fecharModal(); setMsg("");
   }
   function remover(i: number) { patchAtiva({ cesta: cesta.filter((_, idx) => idx !== i) }); }
+
+  // teclado físico (notebook/teclado USB): digita o peso direto, sem precisar do teclado na tela.
+  // Só atua quando o modal está aberto e o foco NÃO está num campo de texto (preço, bags, kg, %).
+  useEffect(() => {
+    if (!sel) return;
+    function onKey(e: KeyboardEvent) {
+      const alvo = e.target as HTMLElement | null;
+      const tag = alvo?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || alvo?.isContentEditable) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key;
+      if (k >= "0" && k <= "9") { e.preventDefault(); tecla(k); }
+      else if (k === "," || k === ".") { e.preventDefault(); tecla(","); }
+      else if (k === "Backspace") { e.preventDefault(); tecla("back"); }
+      else if (k === "Enter") { e.preventDefault(); adicionar(); }
+      else if (k === "Escape") { e.preventDefault(); fecharModal(); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel, liquido, peso, precoEdit, cesta]);
 
   function obterCatadorPayload(c: Comanda): { pessoa_id: number | null; nome: string; tel: string } | null {
     if (c.modo === "avulso") {
@@ -275,21 +295,12 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
       </div>
       <IndicadorFila pendentes={pendentes} />
 
-      {/* catador — recolhido por padrão (começa Avulso) pra sobrar espaço */}
-      {!verCatador ? (
-        <button onClick={() => setVerCatador(true)}
-          className="flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2 text-left text-sm">
-          <span className="font-bold text-slate-500">Cliente:</span>
-          <span className="font-extrabold text-marca-navy">{rotuloComanda(ativa)}</span>
-          <span className="ml-auto font-bold text-marca-teal-dark">identificar / trocar ▾</span>
-        </button>
-      ) : (
+      {/* catador — sempre visível (acesso rápido ao cadastro) */}
       <div className="rounded-2xl border bg-white p-3">
         <div className="mb-2 flex items-center gap-2">
           <button onClick={() => patchAtiva({ modo: "conhecido" })} className={tab(modo === "conhecido")}>Cadastrado</button>
           <button onClick={() => patchAtiva({ modo: "novo" })} className={tab(modo === "novo")}>Cadastro rápido</button>
           <button onClick={() => patchAtiva({ modo: "avulso" })} className={tab(modo === "avulso")}>Avulso</button>
-          <button onClick={() => setVerCatador(false)} className="ml-auto rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-500">▴ recolher</button>
         </div>
         {modo === "conhecido" ? (
           <div className="relative">
@@ -358,7 +369,6 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
           <p className="text-sm text-slate-500">Compra avulsa (catador não cadastrado).</p>
         )}
       </div>
-      )}
 
       {/* grade */}
       <div>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .folha {
+    width: 281mm;       /* 297 - 2*8 margem */
+    height: 194mm;      /* 210 - 2*8 margem */
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Cabeçalho */
+  .topo {
+    border: 1.5px solid #000;
+    border-bottom: none;
+    text-align: center;
+    padding: 4px 0 5px;
+  }
+  .titulo {
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+  .infos {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+  }
+  .infos .campo { display: inline-flex; align-items: flex-end; gap: 4px; }
+  .linha { display: inline-block; border-bottom: 1px solid #000; }
+  .l-data { width: 28px; }
+  .l-fl   { width: 60px; }
+
+  /* Tabela */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+    flex: 1;
+  }
+  td, th { border: 1px solid #000; }
+  thead th {
+    font-size: 11px;
+    font-weight: bold;
+    height: 22px;
+    text-align: center;
+    background: #e9e9e9;
+  }
+  tbody td { height: 1px; }   /* deixa as linhas se distribuírem */
+
+  /* 4 blocos: cada bloco = PESO | MATERIAL | VALOR + separador */
+  .peso  { width: 6%; }
+  .mat   { width: 10.5%; }
+  .val   { width: 8.5%; }
+  .sep   { width: 0; border-left: 2.5px solid #000 !important; }
+</style>
+</head>
+<body>
+  <div class="folha">
+    <div class="topo">
+      <div class="titulo">VJA RECICLAGEM &nbsp;&mdash;&nbsp; COMPRAS &nbsp;&mdash;&nbsp; DIA</div>
+      <div class="infos">
+        <span class="campo">DATA:
+          <span class="linha l-data">&nbsp;</span>/<span class="linha l-data">&nbsp;</span>/<span class="linha l-data">&nbsp;</span>
+        </span>
+        <span class="campo">FL.: <span class="linha l-fl">&nbsp;</span></span>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="peso">PESO</th><th class="mat">MATERIAL</th><th class="val">VALOR</th>
+          <th class="sep"></th>
+          <th class="peso">PESO</th><th class="mat">MATERIAL</th><th class="val">VALOR</th>
+          <th class="sep"></th>
+          <th class="peso">PESO</th><th class="mat">MATERIAL</th><th class="val">VALOR</th>
+          <th class="sep"></th>
+          <th class="peso">PESO</th><th class="mat">MATERIAL</th><th class="val">VALOR</th>
+        </tr>
+      </thead>
+      <tbody id="corpo"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const linhas = 20;            // linhas por bloco
+    const corpo = document.getElementById('corpo');
+    for (let i = 0; i < linhas; i++) {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td></td><td></td><td></td>' +
+        '<td class="sep"></td>' +
+        '<td></td><td></td><td></td>' +
+        '<td class="sep"></td>' +
+        '<td></td><td></td><td></td>' +
+        '<td class="sep"></td>' +
+        '<td></td><td></td><td></td>';
+      corpo.appendChild(tr);
+    }
+  </script>
+</body>
+</html>

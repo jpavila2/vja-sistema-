@@ -8,6 +8,7 @@ import {
   BotaoAbrir, FormSaque, FormDespesa, FormFechar,
   SaldoInicialEditavel, LinhaMovimento, BotaoReabrir,
 } from "./FormsCaixa";
+import { ListaComprasCaixa } from "./ListaComprasCaixa";
 
 export default async function CaixaPage({ searchParams }: { searchParams: { dia?: string } }) {
   const dia = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.dia ?? "") ? searchParams.dia! : hojeBR();
@@ -24,8 +25,8 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
   ] = await Promise.all([
     supabase.from("cash_sessions").select("*").eq("dia", dia).maybeSingle(),
     supabase.from("cash_movements").select("*").eq("dia", dia).order("created_at"),
-    supabase.from("purchases").select("total, status").eq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
-    supabase.from("purchases").select("total, status").eq("forma_pagamento", "pix").gte("data_hora", inicio).lt("data_hora", fim),
+    supabase.from("purchases").select("id, total, status, data_hora, people(nome), purchase_items(peso_bruto, peso_liquido, preco_unitario, subtotal, materials(nome, emoji, unidade))").eq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim).order("data_hora", { ascending: false }),
+    supabase.from("purchases").select("id, total, status, data_hora, people(nome), purchase_items(peso_bruto, peso_liquido, preco_unitario, subtotal, materials(nome, emoji, unidade))").eq("forma_pagamento", "pix").gte("data_hora", inicio).lt("data_hora", fim).order("data_hora", { ascending: false }),
     supabase.from("sales").select("total, status, people(nome)").eq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
     supabase.from("sales").select("total, status, forma_pagamento, people(nome)").neq("forma_pagamento", "dinheiro").gte("data_hora", inicio).lt("data_hora", fim),
   ]);
@@ -114,7 +115,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
             </div>
             {comprasDin.length === 0
               ? <div className="p-4 text-center text-slate-400">Nenhuma.</div>
-              : <div className="p-3 text-sm text-slate-600">{comprasDin.length} compra(s) — saíram da gaveta</div>}
+              : <ListaComprasCaixa compras={comprasDin} corValor="text-red-600" />}
           </div>
 
           {/* vendas em dinheiro */}
@@ -154,10 +155,14 @@ export default async function CaixaPage({ searchParams }: { searchParams: { dia?
             </div>
           ) : null}
 
-          {/* informativo PIX compras */}
+          {/* compras via PIX — clicáveis, não saíram da gaveta */}
           {comprasPix.length > 0 ? (
-            <div className="rounded-2xl border border-dashed bg-white p-3 text-sm text-slate-500">
-              💳 {comprasPix.length} compra(s) via <b>PIX</b> somando {formatBRL(totalPixCompras)} — não saíram da gaveta.
+            <div className="rounded-2xl border bg-white">
+              <div className="flex items-center justify-between border-b bg-slate-50 p-3">
+                <span className="font-bold text-marca-navy">💳 Compras via PIX (não saíram da gaveta)</span>
+                <span className="font-bold text-slate-600">{formatBRL(totalPixCompras)}</span>
+              </div>
+              <ListaComprasCaixa compras={comprasPix} corValor="text-slate-600" />
             </div>
           ) : null}
 

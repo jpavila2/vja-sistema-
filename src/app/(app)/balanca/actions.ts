@@ -58,6 +58,25 @@ export async function criarCatador(
   return { ok: true, id: data as number, nome: nomeLimpo };
 }
 
+export type CompraRecente = {
+  id: number;
+  quando: string;
+  catador: string;
+  total: number;
+  forma_pagamento: string;
+  status: string;
+  client_request_id: string | null;
+  itens: { nome: string; emoji: string | null; unidade: string; peso: number; preco: number; subtotal: number }[];
+};
+
+/** Últimas compras de qualquer aparelho (via RPC; a balança não lê purchases direto). */
+export async function ultimasCompras(): Promise<CompraRecente[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("ultimas_compras", { p_limite: 40 });
+  if (error) return [];
+  return (data as CompraRecente[]) ?? [];
+}
+
 /** Preços próprios de um catador: mapa material_id -> preço. */
 export async function precosDoCatador(pessoaId: number): Promise<Record<number, number>> {
   const supabase = await createClient();

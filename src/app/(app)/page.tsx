@@ -19,6 +19,8 @@ export default async function PainelPage({ searchParams }: { searchParams: { mes
 
   const [
     { data: comprasHoje },
+    { data: vendasHoje },
+    { data: despesasHoje },
     { data: comprasMes },
     { data: vendasMes },
     { data: despesasMes },
@@ -26,9 +28,13 @@ export default async function PainelPage({ searchParams }: { searchParams: { mes
     { data: sessoesData },
     { data: profData },
   ] = await Promise.all([
-    // compras de HOJE
-    supabase.from("purchases").select("total, status")
+    // compras de HOJE (com itens, p/ ver quais materiais entraram)
+    supabase.from("purchases").select("total, status, purchase_items(peso_liquido, subtotal, materials(nome, emoji, unidade))")
       .gte("data_hora", inicioDia).lt("data_hora", fimDia),
+    // vendas de HOJE
+    supabase.from("sales").select("total, status").gte("data_hora", inicioDia).lt("data_hora", fimDia),
+    // despesas de HOJE (cash_movements)
+    supabase.from("cash_movements").select("valor").eq("tipo", "despesa").eq("dia", hoje),
     // compras do MÊS
     supabase.from("purchases").select("total, status")
       .gte("data_hora", inicioMes).lt("data_hora", fimMes),
@@ -62,6 +68,25 @@ export default async function PainelPage({ searchParams }: { searchParams: { mes
   const dM = (despesasMes as any[]) ?? [];
 
   const totalCompradoHoje = r2(cH.reduce((s: number, c: {total: number}) => s + Number(c.total), 0));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vH = ((vendasHoje as any[]) ?? []).filter((v) => v.status !== "cancelada");
+  const totalVendidoHoje = r2(vH.reduce((s: number, v: {total: number}) => s + Number(v.total), 0));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalDespesasHoje = r2(((despesasHoje as any[]) ?? []).reduce((s: number, d: {valor: number}) => s + Number(d.valor), 0));
+  const resultadoDia = r2(totalVendidoHoje - totalCompradoHoje - totalDespesasHoje);
+
+  // materiais comprados HOJE (quanto de cada um entrou)
+  type MatHoje = { nome: string; emoji: string | null; unidade: string; peso: number; valor: number };
+  const materiaisHoje = (Object.values(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (cH as any[]).flatMap((c) => c.purchase_items ?? []).reduce((acc: Record<string, { nome: string; emoji: string | null; unidade: string; peso: number; valor: number }>, it: { peso_liquido: number; subtotal: number; materials: { nome: string; emoji: string | null; unidade: string } | null }) => {
+      const nome = it.materials?.nome ?? "—";
+      acc[nome] ??= { nome, emoji: it.materials?.emoji ?? null, unidade: it.materials?.unidade ?? "kg", peso: 0, valor: 0 };
+      acc[nome].peso = r2(acc[nome].peso + Number(it.peso_liquido));
+      acc[nome].valor = r2(acc[nome].valor + Number(it.subtotal));
+      return acc;
+    }, {}),
+  ) as MatHoje[]).sort((a, b) => b.valor - a.valor);
   const totalCompradoMes  = r2(cM.reduce((s: number, c: {total: number}) => s + Number(c.total), 0));
   const totalVendidoMes   = r2(vM.reduce((s: number, v: {total: number}) => s + Number(v.total), 0));
   const totalDespesasMes  = r2(dM.reduce((s: number, d: {valor: number}) => s + Number(d.valor), 0));
@@ -138,11 +163,41 @@ export default async function PainelPage({ searchParams }: { searchParams: { mes
       {/* ── hoje (só no mês corrente) ── */}
       {ehMesAtual && (
         <section>
-          <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-slate-500">Hoje</h2>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <CardResumo titulo="Comprado hoje" valor={formatBRL(totalCompradoHoje)} cor="teal" href={`/escritorio/conferencia?dia=${hoje}`} />
-            <CardResumo titulo="Compras hoje" valor={cH.length} cor="navy" href={`/escritorio/conferencia?dia=${hoje}`} />
-            <CardResumo titulo="Ticket médio" valor={formatBRL(cH.length ? r2(totalCompradoHoje / cH.length) : 0)} cor="gold" href={`/escritorio/conferencia?dia=${hoje}`} />
+          <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-slate-500">Visão do dia</h2>
+          {/* entrou × saiu do dia — bate o olho */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <CardResumo titulo="Entrou (vendas)" valor={formatBRL(totalVendidoHoje)} cor="green" href={`/escritorio/vendas`} />
+            <CardResumo titulo="Saiu (compras)" valor={formatBRL(totalCompradoHoje)} cor="gold" href={`/escritorio/conferencia?dia=${hoje}`} />
+            <CardResumo titulo="Despesas" valor={formatBRL(totalDespesasHoje)} cor="navy" href={`/escritorio/caixa?dia=${hoje}`} />
+            <CardResumo
+              titulo="Resultado do dia"
+              valor={formatBRL(Math.abs(resultadoDia))}
+              cor={resultadoDia >= 0 ? "green" : "gold"}
+              sufixo={resultadoDia >= 0 ? "▲ positivo" : "▼ negativo"}
+              href={`/escritorio/caixa?dia=${hoje}`}
+            />
+          </div>
+
+          {/* materiais comprados hoje */}
+          <div className="mt-4 rounded-2xl border bg-white">
+            <div className="flex items-center justify-between border-b bg-slate-50 p-3">
+              <span className="font-bold text-marca-navy">Materiais comprados hoje</span>
+              <Link href={`/escritorio/conferencia?dia=${hoje}`} className="text-xs font-semibold text-marca-teal-dark underline">ver compras</Link>
+            </div>
+            {materiaisHoje.length === 0 ? (
+              <div className="p-5 text-center text-slate-400">Nenhuma compra registrada hoje.</div>
+            ) : (
+              <ul className="divide-y">
+                {materiaisHoje.map((m) => (
+                  <li key={m.nome} className="flex items-center gap-3 p-3">
+                    <span className="text-2xl">{m.emoji}</span>
+                    <span className="flex-1 font-semibold text-slate-700">{m.nome}</span>
+                    <span className="font-bold text-marca-navy">{m.peso.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} {m.unidade}</span>
+                    <span className="w-28 text-right font-extrabold text-marca-teal-dark">{formatBRL(m.valor)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </section>
       )}

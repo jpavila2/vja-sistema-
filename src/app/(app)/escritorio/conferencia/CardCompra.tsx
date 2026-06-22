@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
-import { conferirCompra, cancelarCompra, editarCompra, excluirCompra, alterarDataCompra, trocarFornecedorCompra } from "./actions";
+import { conferirCompra, cancelarCompra, editarCompra, excluirCompra, alterarDataCompra, trocarFornecedorCompra, salvarPrecosCliente } from "./actions";
 import { buscarCatadores } from "@/lib/catador";
 
 // yyyy-mm-dd no fuso de São Paulo (para o <input type="date">)
@@ -27,6 +27,7 @@ export type Compra = {
   forma_pagamento: string;
   data_hora: string;
   observacoes: string | null;
+  pessoa_id: number | null;
   people: { nome: string } | null;
   purchase_items: Item[];
 };
@@ -56,6 +57,7 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
   const [linhas, setLinhas] = useState<LinhaEdit[]>([]);
   const [forma, setForma] = useState(c.forma_pagamento === "pix" ? "pix" : "dinheiro");
   const [addId, setAddId] = useState("");
+  const [salvarPrecos, setSalvarPrecos] = useState(false);
   const [msg, setMsg] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -72,6 +74,7 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
       }))
     );
     setForma(c.forma_pagamento === "pix" ? "pix" : "dinheiro");
+    setSalvarPrecos(false);
     setMsg("");
     setEditando(true);
   }
@@ -118,6 +121,16 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
     startTransition(async () => {
       try {
         await editarCompra({ id: c.id, forma_pagamento: forma, itens });
+        if (salvarPrecos && c.pessoa_id != null) {
+          // salva o preço por material deste cliente (último preço lançado vence)
+          const precos = linhas
+            .filter((l) => num(l.precoStr) > 0)
+            .map((l) => ({ material_id: l.material_id, preco: num(l.precoStr) }));
+          if (precos.length > 0) {
+            try { await salvarPrecosCliente(c.pessoa_id, precos); }
+            catch { /* preço é secundário — não bloqueia a edição da compra */ }
+          }
+        }
         setEditando(false);
       } catch (e) {
         setMsg(e instanceof Error ? e.message : "Erro ao salvar.");
@@ -178,6 +191,14 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
             </select>
           </div>
         </div>
+
+        {c.pessoa_id != null ? (
+          <label className="mt-3 flex items-center gap-2 rounded-xl bg-marca-teal-light/40 p-2.5 text-sm font-semibold text-marca-teal-dark">
+            <input type="checkbox" checked={salvarPrecos} onChange={(e) => setSalvarPrecos(e.target.checked)}
+              className="h-4 w-4" />
+            💾 Salvar esses preços para {c.people?.nome ?? "este cliente"} (vira o preço padrão dele na balança)
+          </label>
+        ) : null}
 
         <div className="mt-3 flex items-center justify-between">
           <span className="text-lg font-black text-marca-navy">Novo total: {formatBRL(totalEdit)}</span>
