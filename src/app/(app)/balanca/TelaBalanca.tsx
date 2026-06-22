@@ -72,6 +72,19 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
     return () => { ativo = false; };
   }, [catadorId]);
 
+  // quando os preços do catador chegam (async, depois de selecioná-lo), aplica no
+  // material já aberto — desde que o operador ainda não tenha digitado outro preço
+  useEffect(() => {
+    if (!sel) return;
+    const p = precosCatador[sel.id];
+    if (p == null) return;
+    const atual = parseFloat(precoStr.replace(",", ".")) || 0;
+    if (precoStr === "" || atual === sel.preco_compra) {
+      setPrecoStr(String(p));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [precosCatador, sel]);
+
   // ── sincroniza modal <-> comanda ativa ───────────────────────────────────
   const modalDaComanda = useRef<string | null>(null);
   const pulaPersist = useRef(false);
