@@ -159,7 +159,7 @@ export function TelaBalanca({ materiais, fornecedores, avulsoId }: Props) {
       subtotal: calcSubtotal(liquido, precoEdit),
     };
     patchAtiva({ cesta: [...cesta, item], emAndamento: null });
-    fecharModal(); setMsg("");
+    fecharModal(); setMsg(""); setBuscaMat("");
   }
   function remover(i: number) { patchAtiva({ cesta: cesta.filter((_, idx) => idx !== i) }); }
 
