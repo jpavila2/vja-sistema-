@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { formatBRL, calcSubtotal } from "@/lib/format";
+import { dinheiroDe, rotuloPagamento } from "@/lib/pagamento";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { conferirCompra, cancelarCompra, editarCompra, excluirCompra, alterarDataCompra, trocarFornecedorCompra, salvarPrecosCliente } from "./actions";
 import { buscarCatadores } from "@/lib/catador";
@@ -25,6 +26,7 @@ export type Compra = {
   total: number;
   status: string;
   forma_pagamento: string;
+  valor_pix: number;
   data_hora: string;
   observacoes: string | null;
   pessoa_id: number | null;
@@ -55,7 +57,9 @@ type Fornecedor = { id: number; nome: string };
 export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Compra; materiais: MaterialOpt[]; fornecedores: Fornecedor[] }) {
   const [editando, setEditando] = useState(false);
   const [linhas, setLinhas] = useState<LinhaEdit[]>([]);
-  const [forma, setForma] = useState(c.forma_pagamento === "pix" ? "pix" : "dinheiro");
+  const formaInicial = (f: string) => (f === "pix" || f === "misto" ? f : "dinheiro");
+  const [forma, setForma] = useState(formaInicial(c.forma_pagamento));
+  const [pixStr, setPixStr] = useState(c.valor_pix > 0 ? String(c.valor_pix) : "");
   const [addId, setAddId] = useState("");
   const [salvarPrecos, setSalvarPrecos] = useState(false);
   const [msg, setMsg] = useState("");
@@ -73,7 +77,8 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
         precoStr: String(it.preco_unitario),
       }))
     );
-    setForma(c.forma_pagamento === "pix" ? "pix" : "dinheiro");
+    setForma(formaInicial(c.forma_pagamento));
+    setPixStr(c.valor_pix > 0 ? String(c.valor_pix) : "");
     setSalvarPrecos(false);
     setMsg("");
     setEditando(true);
@@ -118,9 +123,14 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
       setMsg("Coloque ao menos um item com peso.");
       return;
     }
+    const pix = num(pixStr);
+    if (forma === "misto" && (pix <= 0 || pix >= totalEdit)) {
+      setMsg("No misto, o valor do PIX precisa ser maior que 0 e menor que o total.");
+      return;
+    }
     startTransition(async () => {
       try {
-        await editarCompra({ id: c.id, forma_pagamento: forma, itens });
+        await editarCompra({ id: c.id, forma_pagamento: forma, valor_pix: forma === "misto" ? pix : 0, itens });
         if (salvarPrecos && c.pessoa_id != null) {
           // salva o preço por material deste cliente (último preço lançado vence)
           const precos = linhas
@@ -182,13 +192,25 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
             ))}
           </select>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             <label className="text-xs font-bold text-slate-500">Pagamento</label>
             <select value={forma} onChange={(e) => setForma(e.target.value)} aria-label="Forma de pagamento"
               className="rounded-full border px-3 py-2 text-sm font-semibold">
               <option value="dinheiro">Dinheiro</option>
               <option value="pix">PIX</option>
+              <option value="misto">Misto (dinheiro + PIX)</option>
             </select>
+            {forma === "misto" ? (
+              <label className="flex items-center gap-1 text-xs font-bold text-slate-500">
+                PIX R$
+                <input inputMode="decimal" value={pixStr} onChange={(e) => setPixStr(e.target.value)}
+                  aria-label="Valor pago em PIX"
+                  className="w-20 rounded-lg border p-1.5 text-center text-base font-bold" />
+                <span className="text-marca-teal-dark">
+                  Dinheiro: {formatBRL(dinheiroDe(totalEdit, num(pixStr)))}
+                </span>
+              </label>
+            ) : null}
           </div>
         </div>
 
@@ -227,7 +249,7 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
         </span>
         {c.status !== "pendente" ? (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
-            {c.forma_pagamento === "pix" ? "PIX" : "Dinheiro"}
+            {rotuloPagamento(c.forma_pagamento, c.total, c.valor_pix)}
           </span>
         ) : null}
         <span className="ml-auto text-xl font-black text-marca-navy">{formatBRL(c.total)}</span>
@@ -242,16 +264,7 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
 
       <div className="mt-3 flex flex-wrap gap-2">
         {c.status === "pendente" ? (
-          <form action={conferirCompra} className="flex items-center gap-2">
-            <input type="hidden" name="id" value={c.id} />
-            <select name="forma_pagamento" defaultValue="dinheiro" className="rounded-full border px-3 py-2 text-sm font-semibold">
-              <option value="dinheiro">Dinheiro</option>
-              <option value="pix">PIX</option>
-            </select>
-            <button className="rounded-full bg-marca-teal px-4 py-2 text-sm font-bold text-white hover:bg-marca-teal-dark">
-              ✓ Conferir
-            </button>
-          </form>
+          <FormConferir id={c.id} total={c.total} />
         ) : null}
 
         {c.status !== "cancelada" ? (
@@ -299,6 +312,39 @@ export function CardCompra({ compra: c, materiais, fornecedores }: { compra: Com
         </BotaoConfirmar>
       </div>
     </div>
+  );
+}
+
+/** Form do botão "Conferir": escolhe a forma de pagamento (com opção Misto). */
+function FormConferir({ id, total }: { id: number; total: number }) {
+  const [forma, setForma] = useState("dinheiro");
+  const [pixStr, setPixStr] = useState("");
+  const pix = num(pixStr);
+  const mistoInvalido = forma === "misto" && (pix <= 0 || pix >= total);
+  return (
+    <form action={conferirCompra} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="valor_pix" value={forma === "misto" ? pixStr : ""} />
+      <select name="forma_pagamento" value={forma} onChange={(e) => setForma(e.target.value)}
+        aria-label="Forma de pagamento" className="rounded-full border px-3 py-2 text-sm font-semibold">
+        <option value="dinheiro">Dinheiro</option>
+        <option value="pix">PIX</option>
+        <option value="misto">Misto (dinheiro + PIX)</option>
+      </select>
+      {forma === "misto" ? (
+        <label className="flex items-center gap-1 text-xs font-bold text-slate-500">
+          PIX R$
+          <input inputMode="decimal" value={pixStr} onChange={(e) => setPixStr(e.target.value)}
+            aria-label="Valor pago em PIX"
+            className="w-20 rounded-lg border p-1.5 text-center text-base font-bold" />
+          <span className="text-marca-teal-dark">Dinheiro: {formatBRL(dinheiroDe(total, pix))}</span>
+        </label>
+      ) : null}
+      <button disabled={mistoInvalido}
+        className="rounded-full bg-marca-teal px-4 py-2 text-sm font-bold text-white hover:bg-marca-teal-dark disabled:bg-slate-300">
+        ✓ Conferir
+      </button>
+    </form>
   );
 }
 
