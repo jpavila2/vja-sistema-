@@ -6,7 +6,7 @@ import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { NavData } from "@/components/NavData";
 import { BotaoExportar } from "@/components/BotaoExportar";
 import { ResumoMateriais, temAClassificar } from "@/components/ResumoMateriais";
-import { cancelarVenda } from "./actions";
+import { cancelarVenda, excluirVenda } from "./actions";
 import { TelaVendas } from "./TelaVendas";
 import { EditorClienteVenda } from "./EditorClienteVenda";
 import { EditorVenda } from "./EditorVenda";
@@ -136,6 +136,15 @@ export default async function VendasPage({ searchParams }: { searchParams: { dia
                   mensagem={`Cancelar venda de ${formatBRL(v.total)} para ${v.people?.nome}? O estoque será estornado.`}
                   className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
                   Cancelar
+                </BotaoConfirmar>
+              ) : null}
+              {isAdmin ? (
+                <BotaoConfirmar
+                  acao={excluirVenda}
+                  hidden={{ id: v.id }}
+                  mensagem={`EXCLUIR DE VEZ a venda de ${formatBRL(v.total)} para ${v.people?.nome ?? "—"}? Ela some do sistema e do histórico${v.status !== "cancelada" ? ", e o estoque volta" : ""}. Não dá pra desfazer.`}
+                  className="rounded-lg border border-red-500 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100">
+                  🗑️ Excluir
                 </BotaoConfirmar>
               ) : null}
             </div>

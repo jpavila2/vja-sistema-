@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
-import { cancelarVendaDet } from "./actions";
+import { cancelarVendaDet, excluirVendaDet } from "./actions";
 
 const BADGE: Record<string, string> = {
   ativa: "bg-marca-teal-light text-marca-teal-dark",
@@ -73,8 +73,8 @@ export default async function VendaDetalhe({ params }: { params: { id: string } 
         </div>
       </div>
 
-      {venda.status === "ativa" ? (
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
+        {venda.status === "ativa" ? (
           <BotaoConfirmar
             acao={cancelarVendaDet}
             hidden={{ id: venda.id }}
@@ -83,8 +83,16 @@ export default async function VendaDetalhe({ params }: { params: { id: string } 
           >
             Cancelar venda
           </BotaoConfirmar>
-        </div>
-      ) : null}
+        ) : null}
+        <BotaoConfirmar
+          acao={excluirVendaDet}
+          hidden={{ id: venda.id }}
+          mensagem={`EXCLUIR DE VEZ a venda para ${nome} (${formatBRL(Number(venda.total))})? Ela some do sistema${venda.status !== "cancelada" ? " e o estoque volta" : ""}. Não dá pra desfazer.`}
+          className="rounded-full border border-red-500 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100"
+        >
+          🗑️ Excluir de vez
+        </BotaoConfirmar>
+      </div>
     </div>
   );
 }

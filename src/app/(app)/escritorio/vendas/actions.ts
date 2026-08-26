@@ -119,3 +119,18 @@ export async function cancelarVenda(formData: FormData): Promise<void> {
   revalidatePath("/escritorio/caixa");
   revalidatePath("/");
 }
+
+export async function excluirVenda(formData: FormData): Promise<void> {
+  const id = Number(formData.get("id"));
+  if (!id) throw new Error("Venda inválida.");
+  const { supabase } = await exigirPapel(["admin", "escritorio"]);
+  const { error } = await supabase.rpc("excluir_venda", { p_id: id });
+  if (error) throw new Error("Não foi possível excluir: " + error.message);
+  revalidatePath("/escritorio/vendas");
+  revalidatePath("/escritorio/historico");
+  revalidatePath("/escritorio/caixa");
+  revalidatePath("/escritorio/areceber");
+  revalidatePath("/escritorio/materiais");
+  revalidatePath("/escritorio/relatorio");
+  revalidatePath("/");
+}
