@@ -4,6 +4,8 @@ import { formatBRL } from "@/lib/format";
 import { BotaoConfirmar } from "@/components/BotaoConfirmar";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { NavData } from "@/components/NavData";
+import { BotaoExportar } from "@/components/BotaoExportar";
+import { ResumoMateriais, temAClassificar } from "@/components/ResumoMateriais";
 import { cancelarVenda } from "./actions";
 import { TelaVendas } from "./TelaVendas";
 import { EditorClienteVenda } from "./EditorClienteVenda";
@@ -56,13 +58,35 @@ export default async function VendasPage({ searchParams }: { searchParams: { dia
     .filter((v) => v.status === "ativa")
     .reduce((s, v) => s + v.total, 0);
 
+  // vendas do dia que ainda têm material "a classificar" esperando os valores da empresa
+  const pendentesClassificacao = vendas.filter(
+    (v) => v.status === "ativa" && temAClassificar(v.sale_items ?? []),
+  );
+
   return (
     <div className="space-y-4">
       <RealtimeRefresh tables={["sales", "sale_items"]} canal="vendas" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-marca-navy">Vendas</h1>
-        <NavData dia={dia} base="/escritorio/vendas" />
+        <div className="flex items-center gap-2">
+          <BotaoExportar tipo="vendas" dia={dia} rotulo="Exportar dia" />
+          <NavData dia={dia} base="/escritorio/vendas" />
+        </div>
       </div>
+
+      {/* ── pendentes de classificação ── */}
+      {pendentesClassificacao.length > 0 && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3">
+          <div className="font-bold text-amber-800">
+            🏷️ {pendentesClassificacao.length}{" "}
+            {pendentesClassificacao.length === 1 ? "venda aguarda" : "vendas aguardam"} classificação
+          </div>
+          <div className="mt-0.5 text-sm text-amber-700">
+            Quando a empresa devolver o peso e o valor corretos, edite a venda e troque o material
+            &ldquo;A classificar&rdquo; pelos materiais reais.
+          </div>
+        </div>
+      )}
 
       {/* ── vendas do dia ── */}
       {vendas.length > 0 ? (
@@ -90,6 +114,7 @@ export default async function VendasPage({ searchParams }: { searchParams: { dia
                    v.forma_pagamento === "transferencia" ? "🏦 Transferência" :
                    v.forma_pagamento === "boleto" ? "📄 Boleto" : "📑 Cheque"}
                 </div>
+                <ResumoMateriais itens={v.sale_items ?? []} />
               </div>
               <span className="font-extrabold text-marca-teal-dark">{formatBRL(v.total)}</span>
               {v.status === "ativa" && (

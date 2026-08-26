@@ -2,12 +2,19 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { limitesMes, limitesMesData, mesAtual, nomeMes } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
+import { BotaoExportar } from "@/components/BotaoExportar";
+import { ResumoMateriais } from "@/components/ResumoMateriais";
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+type ItemLinha = {
+  peso?: number; peso_liquido?: number;
+  materials?: { nome: string; emoji: string | null; unidade: string } | null;
+};
 type Linha = {
   id: number; data_hora: string; total: number; status: string;
   forma_pagamento?: string; people?: { nome: string } | null;
+  itens?: ItemLinha[];
 };
 type Despesa = { id: number; dia: string; categoria: string | null; descricao: string | null; valor: number };
 
@@ -18,16 +25,18 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
   const supabase = await createClient();
 
   const [{ data: vendasData }, { data: comprasData }, { data: despesasData }] = await Promise.all([
-    supabase.from("sales").select("id, data_hora, total, status, forma_pagamento, people(nome)")
+    supabase.from("sales").select("id, data_hora, total, status, forma_pagamento, people(nome), sale_items(peso, materials(nome, emoji, unidade))")
       .gte("data_hora", inicio).lt("data_hora", fim).order("data_hora", { ascending: false }),
-    supabase.from("purchases").select("id, data_hora, total, status, forma_pagamento, people(nome)")
+    supabase.from("purchases").select("id, data_hora, total, status, forma_pagamento, people(nome), purchase_items(peso_liquido, materials(nome, emoji, unidade))")
       .gte("data_hora", inicio).lt("data_hora", fim).order("data_hora", { ascending: false }),
     supabase.from("cash_movements").select("id, dia, categoria, descricao, valor")
       .eq("tipo", "despesa").gte("dia", diaIni).lt("dia", diaFim).order("dia", { ascending: false }),
   ]);
 
-  const vendas = (vendasData as unknown as Linha[]) ?? [];
-  const compras = (comprasData as unknown as Linha[]) ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vendas: Linha[] = ((vendasData as any[]) ?? []).map((v) => ({ ...v, itens: v.sale_items ?? [] }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const compras: Linha[] = ((comprasData as any[]) ?? []).map((c) => ({ ...c, itens: c.purchase_items ?? [] }));
   const despesas = (despesasData as unknown as Despesa[]) ?? [];
   const totalVendas = r2(vendas.filter((v) => v.status === "ativa").reduce((s, v) => s + Number(v.total), 0));
   const totalCompras = r2(compras.filter((c) => c.status !== "cancelada").reduce((s, c) => s + Number(c.total), 0));
@@ -45,9 +54,11 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Tabela titulo="📦 Vendas" total={totalVendas} cor="text-marca-teal-dark"
-          linhas={vendas} rotuloPessoa="Cliente" vazio="Nenhuma venda no mês." hrefBase="/escritorio/venda" />
+          linhas={vendas} rotuloPessoa="Cliente" vazio="Nenhuma venda no mês." hrefBase="/escritorio/venda"
+          exportar={<BotaoExportar tipo="vendas" mes={mes} rotulo="Exportar mês" />} />
         <Tabela titulo="⚖️ Compras" total={totalCompras} cor="text-marca-gold"
-          linhas={compras} rotuloPessoa="Catador" vazio="Nenhuma compra no mês." hrefBase="/escritorio/compra" />
+          linhas={compras} rotuloPessoa="Catador" vazio="Nenhuma compra no mês." hrefBase="/escritorio/compra"
+          exportar={<BotaoExportar tipo="compras" mes={mes} rotulo="Exportar mês" />} />
       </div>
 
       <div className="rounded-2xl border bg-white">
@@ -80,14 +91,18 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
   );
 }
 
-function Tabela({ titulo, total, cor, linhas, rotuloPessoa, vazio, hrefBase }: {
+function Tabela({ titulo, total, cor, linhas, rotuloPessoa, vazio, hrefBase, exportar }: {
   titulo: string; total: number; cor: string; linhas: Linha[]; rotuloPessoa: string; vazio: string; hrefBase: string;
+  exportar?: React.ReactNode;
 }) {
   return (
     <div className="rounded-2xl border bg-white">
-      <div className="flex items-center justify-between border-b bg-slate-50 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 p-3">
         <span className="font-bold text-marca-navy">{titulo} <span className="text-slate-400">({linhas.length})</span></span>
-        <span className={"font-extrabold " + cor}>{formatBRL(total)}</span>
+        <div className="flex items-center gap-2">
+          {exportar}
+          <span className={"font-extrabold " + cor}>{formatBRL(total)}</span>
+        </div>
       </div>
       {linhas.length === 0 ? (
         <div className="p-6 text-center text-slate-400">{vazio}</div>
@@ -104,6 +119,7 @@ function Tabela({ titulo, total, cor, linhas, rotuloPessoa, vazio, hrefBase }: {
                 <div className="text-xs text-slate-400">
                   {rotuloPessoa}{l.status === "cancelada" ? " · cancelada" : ""}
                 </div>
+                <ResumoMateriais itens={l.itens ?? []} />
               </div>
               <span className={"font-bold " + cor}>{formatBRL(Number(l.total))}</span>
               <span className="text-slate-300">›</span>

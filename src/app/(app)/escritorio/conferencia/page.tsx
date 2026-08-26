@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { hojeBR, limitesDoDiaBR } from "@/lib/datas";
 import { NavData } from "@/components/NavData";
+import { BotaoExportar } from "@/components/BotaoExportar";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { ListaConferencia } from "./ListaConferencia";
 
@@ -22,7 +23,10 @@ export default async function ConferenciaPage({ searchParams }: { searchParams: 
       <RealtimeRefresh tables={["purchases", "purchase_items", "stock_movements"]} canal="conferencia" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-marca-navy">Conferência</h1>
-        <NavData dia={dia} base="/escritorio/conferencia" />
+        <div className="flex items-center gap-2">
+          <BotaoExportar tipo="compras" dia={dia} rotulo="Exportar dia" />
+          <NavData dia={dia} base="/escritorio/conferencia" />
+        </div>
       </div>
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <ListaConferencia compras={(data as any) ?? []} materiais={(materiais as any) ?? []} fornecedores={(fornecedoresData as any) ?? []} />
