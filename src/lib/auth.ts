@@ -1,8 +1,10 @@
 export type Papel = "admin" | "escritorio" | "balanca";
 
+// "/api" cobre as rotas de dados (ex.: exportação de CSV); a própria rota valida
+// a sessão e o RLS limita o que cada papel enxerga.
 const ACESSO: Record<Papel, string[]> = {
-  admin: ["/", "/escritorio", "/balanca"],
-  escritorio: ["/escritorio", "/balanca"],
+  admin: ["/", "/escritorio", "/balanca", "/api"],
+  escritorio: ["/escritorio", "/balanca", "/api"],
   balanca: ["/balanca"],
 };
 

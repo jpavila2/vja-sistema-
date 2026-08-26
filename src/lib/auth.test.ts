@@ -11,6 +11,10 @@ const casos: [Papel, string, boolean][] = [
   ["balanca", "/", false],
   ["balanca", "/escritorio", false],
   ["balanca", "/balanca", true],
+  // exportação de CSV e afins: escritório e admin sim, balança não
+  ["admin", "/api/exportar", true],
+  ["escritorio", "/api/exportar", true],
+  ["balanca", "/api/exportar", false],
 ];
 
 describe("rotaPermitida", () => {
