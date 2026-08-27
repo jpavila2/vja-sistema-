@@ -28,6 +28,11 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isLogin = path === "/login";
 
+  // Rotas de dados (/api/*) se protegem sozinhas: conferem a sessão e devolvem
+  // 401/403 em JSON. Passar por aqui só transformaria isso num redirect, que o
+  // navegador segue silenciosamente e quebra downloads (ex.: exportação de CSV).
+  if (path.startsWith("/api/")) return response;
+
   if (!user && !isLogin) {
     return NextResponse.redirect(new URL("/login", request.url));
   }

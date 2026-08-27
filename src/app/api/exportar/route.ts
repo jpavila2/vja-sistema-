@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { exigirPapel } from "@/lib/supabase/guard";
 import { limitesDoDiaBR, limitesMes } from "@/lib/datas";
 import { montarCSV, numeroBR } from "@/lib/exportar";
 
@@ -47,11 +47,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ erro: "Informe dia=YYYY-MM-DD ou mes=YYYY-MM." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-
-  // A sessão precisa existir — as políticas de RLS cuidam do resto.
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ erro: "Não autenticado." }, { status: 401 });
+  // O middleware não protege /api/*: quem confere sessão e papel é a própria rota.
+  let supabase;
+  try {
+    ({ supabase } = await exigirPapel(["admin", "escritorio"]));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Sem acesso.";
+    return NextResponse.json({ erro: msg }, { status: msg.includes("autenticado") ? 401 : 403 });
+  }
 
   let cabecalho: string[];
   let linhas: (string | number | null)[][];
