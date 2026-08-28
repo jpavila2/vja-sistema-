@@ -25,6 +25,32 @@ function dataHoraBR(iso: string) {
   };
 }
 
+/**
+ * O PostgREST devolve no máximo ~1000 linhas por consulta e corta o resto sem avisar.
+ * Aqui buscamos em páginas até juntar tudo, avançando pelo tamanho real do lote
+ * (o limite do servidor pode ser menor que o pedido).
+ */
+const PAGINA = 1000;
+
+async function buscarTudo<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  consulta: (de: number, ate: number) => PromiseLike<{ data: any[] | null; error: any; count: number | null }>,
+): Promise<T[]> {
+  const todos: T[] = [];
+  let de = 0;
+  let total = Infinity;
+  while (todos.length < total) {
+    const { data, error, count } = await consulta(de, de + PAGINA - 1);
+    if (error) throw new Error(error.message);
+    if (typeof count === "number") total = count;
+    const lote = (data ?? []) as T[];
+    if (lote.length === 0) break;
+    todos.push(...lote);
+    de += lote.length;
+  }
+  return todos;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const tipo = searchParams.get("tipo");
@@ -60,19 +86,26 @@ export async function GET(request: Request) {
   let linhas: (string | number | null)[][];
 
   if (tipo === "vendas") {
-    const { data, error } = await supabase
-      .from("sales")
-      .select("id, data_hora, total, status, forma_pagamento, observacoes, people(nome), sale_items(peso, preco_unitario, subtotal, materials(nome, unidade))")
-      .gte("data_hora", periodo.inicio)
-      .lt("data_hora", periodo.fim)
-      .order("data_hora", { ascending: true });
-    if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let data: any[];
+    try {
+      data = await buscarTudo((de, ate) => supabase
+        .from("sales")
+        .select("id, data_hora, total, status, forma_pagamento, observacoes, people(nome), sale_items(peso, preco_unitario, subtotal, materials(nome, unidade))", { count: "exact" })
+        .gte("data_hora", periodo.inicio)
+        .lt("data_hora", periodo.fim)
+        .order("data_hora", { ascending: true })
+        .order("id", { ascending: true })   // desempate: sem isso a paginação pode pular/repetir linha
+        .range(de, ate));
+    } catch (e) {
+      return NextResponse.json({ erro: e instanceof Error ? e.message : "Erro ao buscar vendas." }, { status: 500 });
+    }
 
     cabecalho = ["Venda", "Data", "Hora", "Cliente", "Pagamento", "Status",
       "Material", "Peso", "Unidade", "Preço unitário", "Subtotal", "Total da venda", "Observações"];
     linhas = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const v of ((data as any[]) ?? [])) {
+    for (const v of data) {
       const { data: dt, hora } = dataHoraBR(v.data_hora);
       const itens = (v.sale_items as ItemVenda[]) ?? [];
       const base = [v.id, dt, hora, v.people?.nome ?? "—",
@@ -94,19 +127,26 @@ export async function GET(request: Request) {
       }
     }
   } else {
-    const { data, error } = await supabase
-      .from("purchases")
-      .select("id, data_hora, total, status, forma_pagamento, observacoes, people(nome), purchase_items(peso_bruto, peso_liquido, preco_unitario, subtotal, materials(nome, unidade))")
-      .gte("data_hora", periodo.inicio)
-      .lt("data_hora", periodo.fim)
-      .order("data_hora", { ascending: true });
-    if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let data: any[];
+    try {
+      data = await buscarTudo((de, ate) => supabase
+        .from("purchases")
+        .select("id, data_hora, total, status, forma_pagamento, observacoes, people(nome), purchase_items(peso_bruto, peso_liquido, preco_unitario, subtotal, materials(nome, unidade))", { count: "exact" })
+        .gte("data_hora", periodo.inicio)
+        .lt("data_hora", periodo.fim)
+        .order("data_hora", { ascending: true })
+        .order("id", { ascending: true })   // desempate: sem isso a paginação pode pular/repetir linha
+        .range(de, ate));
+    } catch (e) {
+      return NextResponse.json({ erro: e instanceof Error ? e.message : "Erro ao buscar compras." }, { status: 500 });
+    }
 
     cabecalho = ["Compra", "Data", "Hora", "Catador", "Pagamento", "Status",
       "Material", "Peso bruto", "Peso líquido", "Unidade", "Preço unitário", "Subtotal", "Total da compra", "Observações"];
     linhas = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const c of ((data as any[]) ?? [])) {
+    for (const c of data) {
       const { data: dt, hora } = dataHoraBR(c.data_hora);
       const itens = (c.purchase_items as ItemCompra[]) ?? [];
       const base = [c.id, dt, hora, c.people?.nome ?? "—",
