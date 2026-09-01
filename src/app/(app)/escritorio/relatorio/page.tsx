@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { buscarTudo } from "@/lib/supabase/paginar";
 import { anoAtual, limitesAno } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
 import { CardResumo } from "@/components/CardResumo";
@@ -13,26 +14,30 @@ export default async function RelatorioAnoPage({ searchParams }: { searchParams:
   const di = `${ano}-01-01`, df = `${ano + 1}-01-01`;
   const supabase = await createClient();
 
-  const [
-    { data: vendasData }, { data: itensData }, { data: comprasData },
-    { data: despesasData }, { data: materiaisData },
-  ] = await Promise.all([
-    supabase.from("sales").select("total, status, people(nome)")
-      .eq("status", "ativa").gte("data_hora", inicio).lt("data_hora", fim),
-    supabase.from("sale_items").select("subtotal, materials(nome), sales!inner(status, data_hora)")
-      .eq("sales.status", "ativa").gte("sales.data_hora", inicio).lt("sales.data_hora", fim),
-    supabase.from("purchases").select("total, status, people(nome)")
-      .neq("status", "cancelada").gte("data_hora", inicio).lt("data_hora", fim),
-    supabase.from("cash_movements").select("valor").eq("tipo", "despesa").gte("dia", di).lt("dia", df),
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  // Um ano passa MUITO de 1000 linhas: sem paginar, receita/lucro saem menores
+  // que a realidade e sem nenhum aviso.
+  const [vendas, itens, compras, despesasArr, { data: materiaisData }] = await Promise.all([
+    buscarTudo<any>((de, ate) => supabase
+      .from("sales").select("total, status, people(nome)", { count: "exact" })
+      .eq("status", "ativa").gte("data_hora", inicio).lt("data_hora", fim)
+      .order("id", { ascending: true }).range(de, ate)),
+    buscarTudo<any>((de, ate) => supabase
+      .from("sale_items").select("subtotal, materials(nome), sales!inner(status, data_hora)", { count: "exact" })
+      .eq("sales.status", "ativa").gte("sales.data_hora", inicio).lt("sales.data_hora", fim)
+      .order("id", { ascending: true }).range(de, ate)),
+    buscarTudo<any>((de, ate) => supabase
+      .from("purchases").select("total, status, people(nome)", { count: "exact" })
+      .neq("status", "cancelada").gte("data_hora", inicio).lt("data_hora", fim)
+      .order("id", { ascending: true }).range(de, ate)),
+    buscarTudo<any>((de, ate) => supabase
+      .from("cash_movements").select("valor", { count: "exact" })
+      .eq("tipo", "despesa").gte("dia", di).lt("dia", df)
+      .order("id", { ascending: true }).range(de, ate)),
     supabase.from("materials").select("nome, preco_compra, preco_venda, estoque_atual, mostrar_venda")
       .eq("ativo", true),
   ]);
 
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const vendas = (vendasData as any[]) ?? [];
-  const itens = (itensData as any[]) ?? [];
-  const compras = (comprasData as any[]) ?? [];
-  const despesasArr = (despesasData as any[]) ?? [];
   const materiais = (materiaisData as any[]) ?? [];
   /* eslint-enable @typescript-eslint/no-explicit-any */
 

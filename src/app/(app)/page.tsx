@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { buscarTudo } from "@/lib/supabase/paginar";
 import { hojeBR, limitesDoDiaBR, limitesMes, limitesMesData, mesAtual, nomeMes } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
 import { CardResumo } from "@/components/CardResumo";
@@ -35,15 +36,21 @@ export default async function PainelPage({ searchParams }: { searchParams: { mes
     supabase.from("sales").select("total, status").gte("data_hora", inicioDia).lt("data_hora", fimDia),
     // despesas de HOJE (cash_movements)
     supabase.from("cash_movements").select("valor").eq("tipo", "despesa").eq("dia", hoje),
-    // compras do MÊS
-    supabase.from("purchases").select("total, status")
-      .gte("data_hora", inicioMes).lt("data_hora", fimMes),
-    // vendas do MÊS
-    supabase.from("sales").select("total, status")
-      .gte("data_hora", inicioMes).lt("data_hora", fimMes),
-    // despesas do MÊS (cash_movements tipo=despesa)
-    supabase.from("cash_movements").select("valor, categoria")
-      .eq("tipo", "despesa").gte("dia", diaIniMes).lt("dia", diaFimMes),
+    // compras do MÊS — paginado (o PostgREST corta em 1000 linhas sem avisar)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buscarTudo<any>((de, ate) => supabase.from("purchases").select("total, status", { count: "exact" })
+      .gte("data_hora", inicioMes).lt("data_hora", fimMes)
+      .order("id", { ascending: true }).range(de, ate)).then((data) => ({ data })),
+    // vendas do MÊS — paginado
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buscarTudo<any>((de, ate) => supabase.from("sales").select("total, status", { count: "exact" })
+      .gte("data_hora", inicioMes).lt("data_hora", fimMes)
+      .order("id", { ascending: true }).range(de, ate)).then((data) => ({ data })),
+    // despesas do MÊS (cash_movements tipo=despesa) — paginado
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buscarTudo<any>((de, ate) => supabase.from("cash_movements").select("valor, categoria", { count: "exact" })
+      .eq("tipo", "despesa").gte("dia", diaIniMes).lt("dia", diaFimMes)
+      .order("id", { ascending: true }).range(de, ate)).then((data) => ({ data })),
     // estoque atual
     supabase.from("materials").select("id, nome, emoji, unidade, estoque_atual, estoque_minimo, categoria")
       .eq("ativo", true).order("categoria").order("nome"),

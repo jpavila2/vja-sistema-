@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { exigirPapel } from "@/lib/supabase/guard";
 import { limitesDoDiaBR, limitesMes } from "@/lib/datas";
 import { montarCSV, numeroBR } from "@/lib/exportar";
+import { buscarTudo } from "@/lib/supabase/paginar";
 
 const FORMA: Record<string, string> = {
   dinheiro: "Dinheiro", pix: "PIX", transferencia: "Transferência",
@@ -23,32 +24,6 @@ function dataHoraBR(iso: string) {
     data: d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }),
     hora: d.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
   };
-}
-
-/**
- * O PostgREST devolve no máximo ~1000 linhas por consulta e corta o resto sem avisar.
- * Aqui buscamos em páginas até juntar tudo, avançando pelo tamanho real do lote
- * (o limite do servidor pode ser menor que o pedido).
- */
-const PAGINA = 1000;
-
-async function buscarTudo<T>(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  consulta: (de: number, ate: number) => PromiseLike<{ data: any[] | null; error: any; count: number | null }>,
-): Promise<T[]> {
-  const todos: T[] = [];
-  let de = 0;
-  let total = Infinity;
-  while (todos.length < total) {
-    const { data, error, count } = await consulta(de, de + PAGINA - 1);
-    if (error) throw new Error(error.message);
-    if (typeof count === "number") total = count;
-    const lote = (data ?? []) as T[];
-    if (lote.length === 0) break;
-    todos.push(...lote);
-    de += lote.length;
-  }
-  return todos;
 }
 
 export async function GET(request: Request) {

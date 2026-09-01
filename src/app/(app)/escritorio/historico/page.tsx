@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { buscarTudo } from "@/lib/supabase/paginar";
 import { limitesMes, limitesMesData, mesAtual, nomeMes } from "@/lib/datas";
 import { formatBRL } from "@/lib/format";
 import { BotaoExportar } from "@/components/BotaoExportar";
@@ -24,14 +25,23 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
   const { ini: diaIni, fim: diaFim } = limitesMesData(mes);
   const supabase = await createClient();
 
-  const [{ data: vendasData }, { data: comprasData }, { data: despesasData }] = await Promise.all([
-    supabase.from("sales").select("id, data_hora, total, status, forma_pagamento, people(nome), sale_items(peso, materials(nome, emoji, unidade))")
-      .gte("data_hora", inicio).lt("data_hora", fim).order("data_hora", { ascending: false }),
-    supabase.from("purchases").select("id, data_hora, total, status, forma_pagamento, people(nome), purchase_items(peso_liquido, materials(nome, emoji, unidade))")
-      .gte("data_hora", inicio).lt("data_hora", fim).order("data_hora", { ascending: false }),
-    supabase.from("cash_movements").select("id, dia, categoria, descricao, valor")
-      .eq("tipo", "despesa").gte("dia", diaIni).lt("dia", diaFim).order("dia", { ascending: false }),
+  // Paginado: sem isso o PostgREST corta em 1000 linhas e o total do mês sai menor.
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const [vendasData, comprasData, despesasData] = await Promise.all([
+    buscarTudo<any>((de, ate) => supabase
+      .from("sales").select("id, data_hora, total, status, forma_pagamento, people(nome), sale_items(peso, materials(nome, emoji, unidade))", { count: "exact" })
+      .gte("data_hora", inicio).lt("data_hora", fim)
+      .order("data_hora", { ascending: false }).order("id", { ascending: false }).range(de, ate)),
+    buscarTudo<any>((de, ate) => supabase
+      .from("purchases").select("id, data_hora, total, status, forma_pagamento, people(nome), purchase_items(peso_liquido, materials(nome, emoji, unidade))", { count: "exact" })
+      .gte("data_hora", inicio).lt("data_hora", fim)
+      .order("data_hora", { ascending: false }).order("id", { ascending: false }).range(de, ate)),
+    buscarTudo<any>((de, ate) => supabase
+      .from("cash_movements").select("id, dia, categoria, descricao, valor", { count: "exact" })
+      .eq("tipo", "despesa").gte("dia", diaIni).lt("dia", diaFim)
+      .order("dia", { ascending: false }).order("id", { ascending: false }).range(de, ate)),
   ]);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vendas: Linha[] = ((vendasData as any[]) ?? []).map((v) => ({ ...v, itens: v.sale_items ?? [] }));

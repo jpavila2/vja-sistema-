@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { buscarTudo } from "@/lib/supabase/paginar";
 import { formatBRL } from "@/lib/format";
 import { marcarRecebido } from "../vendas/actions";
 
@@ -16,13 +17,13 @@ const FORMA: Record<string, string> = {
 
 export default async function AReceberPage() {
   const supabase = await createClient();
-  const { data } = await supabase
+  // Paginado: o total a receber não pode parar em 1000 vendas.
+  const vendas = await buscarTudo<Venda>((de, ate) => supabase
     .from("sales")
-    .select("id, data_hora, total, forma_pagamento, observacoes, people(nome)")
+    .select("id, data_hora, total, forma_pagamento, observacoes, people(nome)", { count: "exact" })
     .eq("status", "ativa").eq("recebido", false)
-    .order("data_hora", { ascending: true });
-
-  const vendas = (data as unknown as Venda[]) ?? [];
+    .order("data_hora", { ascending: true }).order("id", { ascending: true })
+    .range(de, ate));
   const total = r2(vendas.reduce((s, v) => s + Number(v.total), 0));
 
   // agrupa por cliente para visão de quem deve
