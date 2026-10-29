@@ -68,7 +68,10 @@ export default async function HistoricoPage({ searchParams }: { searchParams: { 
           exportar={<BotaoExportar tipo="vendas" mes={mes} rotulo="Exportar mês" />} />
         <Tabela titulo="⚖️ Compras" total={totalCompras} cor="text-marca-gold"
           linhas={compras} rotuloPessoa="Catador" vazio="Nenhuma compra no mês." hrefBase="/escritorio/compra"
-          exportar={<BotaoExportar tipo="compras" mes={mes} rotulo="Exportar mês" />} />
+          exportar={<>
+            <BotaoExportar tipo="compras" mes={mes} rotulo="Exportar mês" />
+            <BotaoExportar tipo="compras" mes={mes} pagamento="pix" rotulo="Só PIX" />
+          </>} />
       </div>
 
       <div className="rounded-2xl border bg-white">

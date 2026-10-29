@@ -47,3 +47,32 @@ export function rotuloPagamento(forma: string, total: number, valorPix: number):
   }
   return "Dinheiro";
 }
+
+/** Filtro de pagamento das telas/exportação. "misto" entra nos dois lados. */
+export type FiltroPagamento = "todos" | "dinheiro" | "pix";
+
+/** A compra tem alguma parte paga nessa forma? (misto conta em PIX e em dinheiro) */
+export function passaNoFiltro(forma: string, filtro: FiltroPagamento): boolean {
+  if (filtro === "todos") return true;
+  if (filtro === "pix") return forma === "pix" || forma === "misto";
+  return forma !== "pix"; // dinheiro, misto (e formas antigas tratadas como gaveta)
+}
+
+/**
+ * Soma quanto saiu em PIX e em dinheiro num conjunto de compras.
+ * Compras canceladas ficam de fora; misto é dividido pelo valor_pix.
+ */
+export function somarPorForma(
+  compras: { forma_pagamento: string; total: number; valor_pix: number; status: string }[],
+): { pix: number; dinheiro: number } {
+  let pix = 0;
+  let dinheiro = 0;
+  for (const c of compras) {
+    if (c.status === "cancelada") continue;
+    const total = Number(c.total);
+    const vPix = c.forma_pagamento === "pix" ? total : c.forma_pagamento === "misto" ? Number(c.valor_pix) : 0;
+    pix += vPix;
+    dinheiro += dinheiroDe(total, vPix);
+  }
+  return { pix: round2(pix), dinheiro: round2(dinheiro) };
+}

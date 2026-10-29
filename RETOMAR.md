@@ -34,6 +34,10 @@ no **Codex**, ou em outra máquina.
   destaque para material "a classificar", exportação CSV item a item por dia
   (vendas/conferência) e por mês (histórico) em `/api/exportar`, e botão de
   excluir venda de vez (migration `0028_excluir_venda.sql`, espelha o `0020` das compras).
+- ✅ **29/10/2026** — filtro Todos/Dinheiro/PIX na Conferência (com total de cada) e
+  exportação só PIX (`/api/exportar?...&pagamento=pix`, botões na Conferência e no
+  Histórico); CSV de compras ganhou colunas "Pago em PIX"/"Pago em dinheiro". Misto
+  entra nos dois filtros. Sem migration — usa `forma_pagamento` + `valor_pix`.
 - 🔜 **EM ANDAMENTO: fluxo do material "A classificar".** A ideia acordada:
   botão dedicado na tela de venda que já seleciona o material, pede só o peso
   (preço 0 — o form e o banco já aceitam) e liga "a prazo"; depois, quando a

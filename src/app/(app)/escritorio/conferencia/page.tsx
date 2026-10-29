@@ -25,6 +25,7 @@ export default async function ConferenciaPage({ searchParams }: { searchParams: 
         <h1 className="text-2xl font-bold text-marca-navy">Conferência</h1>
         <div className="flex items-center gap-2">
           <BotaoExportar tipo="compras" dia={dia} rotulo="Exportar dia" />
+          <BotaoExportar tipo="compras" dia={dia} pagamento="pix" rotulo="Exportar PIX" />
           <NavData dia={dia} base="/escritorio/conferencia" />
         </div>
       </div>

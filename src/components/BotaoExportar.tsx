@@ -7,13 +7,16 @@ export function BotaoExportar({
   dia,
   mes,
   rotulo,
+  pagamento,
 }: {
   tipo: "vendas" | "compras";
   dia?: string;
   mes?: string;
   rotulo?: string;
+  /** só compras: exporta apenas as pagas em PIX ou em dinheiro (misto entra nos dois) */
+  pagamento?: "pix" | "dinheiro";
 }) {
-  const periodo = dia ? `dia=${dia}` : `mes=${mes}`;
+  const periodo = (dia ? `dia=${dia}` : `mes=${mes}`) + (pagamento ? `&pagamento=${pagamento}` : "");
   return (
     <a
       href={`/api/exportar?tipo=${tipo}&${periodo}`}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizarPagamento, dinheiroDe, rotuloPagamento } from "./pagamento";
+import { normalizarPagamento, dinheiroDe, rotuloPagamento, passaNoFiltro, somarPorForma } from "./pagamento";
 
 describe("normalizarPagamento", () => {
   it("dinheiro zera o valor_pix", () => {
@@ -52,5 +52,32 @@ describe("rotuloPagamento", () => {
   });
   it("misto mostra a divisão", () => {
     expect(rotuloPagamento("misto", 100, 40)).toBe("Misto · R$ 40,00 pix / R$ 60,00 din");
+  });
+});
+
+describe("passaNoFiltro", () => {
+  it("todos aceita qualquer forma", () => {
+    expect(["dinheiro", "pix", "misto"].every((f) => passaNoFiltro(f, "todos"))).toBe(true);
+  });
+  it("pix pega pix e misto, não dinheiro", () => {
+    expect(passaNoFiltro("pix", "pix")).toBe(true);
+    expect(passaNoFiltro("misto", "pix")).toBe(true);
+    expect(passaNoFiltro("dinheiro", "pix")).toBe(false);
+  });
+  it("dinheiro pega dinheiro e misto, não pix", () => {
+    expect(passaNoFiltro("dinheiro", "dinheiro")).toBe(true);
+    expect(passaNoFiltro("misto", "dinheiro")).toBe(true);
+    expect(passaNoFiltro("pix", "dinheiro")).toBe(false);
+  });
+});
+
+describe("somarPorForma", () => {
+  it("divide misto pelo valor_pix e ignora canceladas", () => {
+    expect(somarPorForma([
+      { forma_pagamento: "pix", total: 100, valor_pix: 100, status: "conferida" },
+      { forma_pagamento: "dinheiro", total: 50, valor_pix: 0, status: "conferida" },
+      { forma_pagamento: "misto", total: 80, valor_pix: 30, status: "conferida" },
+      { forma_pagamento: "pix", total: 999, valor_pix: 999, status: "cancelada" },
+    ])).toEqual({ pix: 130, dinheiro: 100 });
   });
 });

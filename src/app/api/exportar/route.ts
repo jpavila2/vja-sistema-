@@ -3,6 +3,7 @@ import { exigirPapel } from "@/lib/supabase/guard";
 import { limitesDoDiaBR, limitesMes } from "@/lib/datas";
 import { montarCSV, numeroBR } from "@/lib/exportar";
 import { buscarTudo } from "@/lib/supabase/paginar";
+import { dinheiroDe, passaNoFiltro, type FiltroPagamento } from "@/lib/pagamento";
 
 const FORMA: Record<string, string> = {
   dinheiro: "Dinheiro", pix: "PIX", transferencia: "Transferência",
@@ -31,6 +32,9 @@ export async function GET(request: Request) {
   const tipo = searchParams.get("tipo");
   const dia = searchParams.get("dia");
   const mes = searchParams.get("mes");
+  // só compras: ?pagamento=pix|dinheiro (misto entra nos dois)
+  const pg = searchParams.get("pagamento");
+  const filtro: FiltroPagamento = pg === "pix" || pg === "dinheiro" ? pg : "todos";
 
   if (tipo !== "vendas" && tipo !== "compras") {
     return NextResponse.json({ erro: "Use tipo=vendas ou tipo=compras." }, { status: 400 });
@@ -107,7 +111,7 @@ export async function GET(request: Request) {
     try {
       data = await buscarTudo((de, ate) => supabase
         .from("purchases")
-        .select("id, data_hora, total, status, forma_pagamento, observacoes, people(nome), purchase_items(peso_bruto, peso_liquido, preco_unitario, subtotal, materials(nome, unidade))", { count: "exact" })
+        .select("id, data_hora, total, status, forma_pagamento, valor_pix, observacoes, people(nome), purchase_items(peso_bruto, peso_liquido, preco_unitario, subtotal, materials(nome, unidade))", { count: "exact" })
         .gte("data_hora", periodo.inicio)
         .lt("data_hora", periodo.fim)
         .order("data_hora", { ascending: true })
@@ -118,16 +122,21 @@ export async function GET(request: Request) {
     }
 
     cabecalho = ["Compra", "Data", "Hora", "Catador", "Pagamento", "Status",
-      "Material", "Peso bruto", "Peso líquido", "Unidade", "Preço unitário", "Subtotal", "Total da compra", "Observações"];
+      "Material", "Peso bruto", "Peso líquido", "Unidade", "Preço unitário", "Subtotal", "Total da compra",
+      "Pago em PIX", "Pago em dinheiro", "Observações"];
     linhas = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const c of data) {
+      if (filtro !== "todos" && (c.status === "pendente" || !passaNoFiltro(c.forma_pagamento, filtro))) continue;
       const { data: dt, hora } = dataHoraBR(c.data_hora);
       const itens = (c.purchase_items as ItemCompra[]) ?? [];
       const base = [c.id, dt, hora, c.people?.nome ?? "—",
         FORMA[c.forma_pagamento] ?? c.forma_pagamento, c.status];
+      const total = Number(c.total);
+      const vPix = c.forma_pagamento === "pix" ? total : c.forma_pagamento === "misto" ? Number(c.valor_pix) : 0;
+      const pagos = [numeroBR(vPix), numeroBR(dinheiroDe(total, vPix))];
       if (itens.length === 0) {
-        linhas.push([...base, "—", "", "", "", "", "", numeroBR(Number(c.total)), c.observacoes ?? ""]);
+        linhas.push([...base, "—", "", "", "", "", "", numeroBR(total), ...pagos, c.observacoes ?? ""]);
         continue;
       }
       for (const it of itens) {
@@ -138,7 +147,8 @@ export async function GET(request: Request) {
           it.materials?.unidade ?? "",
           numeroBR(Number(it.preco_unitario)),
           numeroBR(Number(it.subtotal)),
-          numeroBR(Number(c.total)),
+          numeroBR(total),
+          ...pagos,
           c.observacoes ?? "",
         ]);
       }
@@ -149,7 +159,7 @@ export async function GET(request: Request) {
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${tipo}-${sufixo}.csv"`,
+      "Content-Disposition": `attachment; filename="${tipo}${filtro !== "todos" ? "-" + filtro : ""}-${sufixo}.csv"`,
       "Cache-Control": "no-store",
     },
   });
