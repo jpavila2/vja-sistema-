@@ -10,8 +10,11 @@ export function numeroBR(n: number, casas = 2): string {
 
 function celula(valor: string | number | null | undefined): string {
   if (valor === null || valor === undefined) return "";
-  const texto = String(valor);
-  return /[";\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  let texto = String(valor);
+  // texto digitado começando com = + - @ vira fórmula no Excel: neutraliza com '
+  // (números do numeroBR, inclusive negativos, passam intactos)
+  if (typeof valor === "string" && /^[=+\-@\t\r]/.test(texto) && !/^-?\d+(,\d+)?$/.test(texto)) texto = "'" + texto;
+  return /[";\n\r]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
 }
 
 export function montarCSV(cabecalho: string[], linhas: (string | number | null)[][]): string {
